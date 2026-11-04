@@ -1,5 +1,7 @@
 {
-  "name": "スクショ取り込みツール for 個体値計算機",
+  "name": "IV Importer",
+  "short_name": "IV Importer",
+  "description": "スクショ取り込みツール for 個体値計算機",
   "lang": "ja",
   "start_url": ".",
   "display": "standalone",
