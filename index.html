@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>スクショ取り込みツール for 個体値計算機</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>スクショ取り込みツール for 個体値計算機</h1>
+  <p>ポケモンスリープの詳細画面のスクショから、「個体値計算機 for ポケモンスリープ」のボックスへ取り込める CSV を作ります。画像は端末の外へ送りません。非公式のファンツールです。</p>
+</header>
+
+<main>
+  <section>
+    <h2>1. スクショを選ぶ</h2>
+    <div class="actions">
+      <label class="button primary">画像を選ぶ<input id="files" type="file" accept="image/*" multiple hidden></label>
+      <button id="add" type="button">手入力で1匹追加</button>
+    </div>
+    <p id="progress" class="note" role="status"></p>
+  </section>
+
+  <section id="level-section" hidden>
+    <h2>2. レベルを一括指定する</h2>
+    <h3>レベル</h3>
+    <div id="levels" class="actions"></div>
+    <p class="note">全員のレベルを書き換えます。個別の変更は下の一覧でできます。</p>
+    <h3>スキルレベル</h3>
+    <div id="skill-levels" class="actions"></div>
+    <p class="note">全員のスキルレベルを書き換えます。「読み取り値」で画面から読んだ値に戻せます。</p>
+  </section>
+
+  <section id="list-section" hidden>
+    <h2>3. 確認・編集する</h2>
+    <p class="note">黄色の項目は読み取りの自信が低いので確認してください。色違いは画面の文字に出ないので、手でチェックしてください。ニックネームを付けた個体は種族名が画面に出ないので、アイコンを見て種族を選んでください。</p>
+    <div id="rows"></div>
+  </section>
+
+  <section id="export-section" hidden>
+    <h2>4. エクスポートする</h2>
+    <p id="summary" role="status"></p>
+    <ul id="problems"></ul>
+    <div class="actions">
+      <button id="copy" class="primary" type="button">CSVをコピー</button>
+      <button id="save" type="button">ファイル保存</button>
+      <a id="open" class="button" href="https://nitoyon.github.io/pokesleep-tool/iv/" target="_blank" rel="noopener">ツールを開く</a>
+    </div>
+    <p class="note">ツールの「ボックス」タブの右上のメニューから「インポート」を選び、貼り付けて取り込みます。</p>
+    <ul class="note">
+      <li>ボックスの上限は300匹です。空きを超えた分は取り込まれません。</li>
+      <li>同じ CSV をもう一度取り込むと、同じポケモンが重複して登録されます。</li>
+    </ul>
+    <details>
+      <summary>CSVの中身を見る</summary>
+      <textarea id="preview" rows="8" readonly></textarea>
+    </details>
+  </section>
+</main>
+
+<script src="data/pokemon.js"></script>
+<script src="data/dict.js"></script>
+<script src="data/icons.js"></script>
+<script src="js/match.js"></script>
+<script src="js/csv.js"></script>
+<script src="js/reader.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

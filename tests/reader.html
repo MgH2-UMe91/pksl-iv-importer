@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>読み取りの正解率</title>
+<pre id="out">読み取り中…</pre>
+<script src="../data/pokemon.js"></script>
+<script src="../data/dict.js"></script>
+<script src="../js/match.js"></script>
+<script src="../js/reader.js"></script>
+<script>
+// samples/truth.json の正解と突き合わせる(samples/ はリポジトリに入れない)
+(async () => {
+  const truth = await (await fetch('../samples/truth.json')).json();
+  const raw = {};
+  for (const name of Object.keys(truth)) {
+    const blob = await (await fetch('../samples/' + name)).blob();
+    raw[name] = await Reader.read(blob);
+    raw[name].icon = undefined;
+    document.getElementById('out').textContent = '読み取り中 ' + Object.keys(raw).length;
+  }
+  window.rawResult = raw;
+  // 項目ごとの正解率
+  const score = {};
+  const hit = (k, ok) => { (score[k] ??= [0, 0])[1]++; if (ok) score[k][0]++; };
+  const misses = [];
+  for (const [name, t] of Object.entries(truth)) {
+    const r = raw[name], sp = Match.species(r.name);
+    const check = (k, got, want) => { hit(k, got === want); if (got !== want) misses.push(`${name} ${k}: ${got} / 正解 ${want}`); };
+    check('種族', sp.species, t.species);
+    check('ニックネーム', sp.nickname, t.nickname);
+    check('性格', Match.nature(r.nature).value, t.nature);
+    check('スキルレベル', r.skillLevel, t.skillLevel);
+    r.sub.forEach((x, i) => check('サブスキル', Match.subskill(x, r.subColor[i]).value, t.sub[i]));
+    const g = Match.ingredients(t.species || t.pick, r.clues);
+    g.ing.forEach((x, i) => check('食材', x, t.ing[i]));
+    if (g.low.length) misses.push(`${name} 食材 自信低: ${g.low}`);
+  }
+  window.score = { score, misses };
+  document.getElementById('out').textContent = Object.entries(score).map(([k, [a, b]]) => `${k} ${a}/${b}`).concat('', misses).join(String.fromCharCode(10));
+})();
+</script>
+</html>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>食材アイコン一覧</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  #list { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; max-width: 860px; margin: 0 auto; padding: 16px; }
+  #list div { text-align: center; font-size: 0.8rem; }
+  #list .ico { width: 84px; height: 84px; padding: 10px; }
+</style>
+<div id="list"></div>
+<script src="../data/dict.js"></script>
+<script src="../data/icons.js"></script>
+<script>
+  document.getElementById('list').innerHTML = INGREDIENTS
+    .map((g) => `<div><span class="ico">${INGREDIENT_ICONS[g]}</span><br>${g}</div>`).join('');
+</script>
+</html>
