@@ -323,3 +323,8 @@ function init() {
 }
 
 init();
+
+// オフライン対応。使えない環境でもそのまま動く
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
+}
