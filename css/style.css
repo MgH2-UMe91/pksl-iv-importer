@@ -171,3 +171,12 @@ textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; m
   .row { grid-template-columns: minmax(0, 1fr); }
   .thumb { width: 96px; }
 }
+
+/* 進化の選択 */
+.field.evo select { width: 100%; }
+.field.evo .check { min-height: 32px; }
+.field.missing select { border-color: var(--error); }
+
+/* 銀種 */
+.seed-note { margin: 0; }
+.seed-note[hidden] { display: none; }

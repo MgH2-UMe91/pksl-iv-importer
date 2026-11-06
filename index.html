@@ -36,6 +36,9 @@
     <h3>スキルレベル</h3>
     <div id="skill-levels" class="actions"></div>
     <p class="note">全員のスキルレベルを書き換えます。「読み取り値」で画面から読んだ値に戻せます。</p>
+    <h3>銀種</h3>
+    <label class="check"><input id="seed-all" type="checkbox">全員に銀種を使う</label>
+    <p class="note">サブスキルを銀種で上げた後の状態で CSV を作ります。通常のサブスキルは S が M になります(同じ名前の M をすでに持っていると変わりません)。最大所持数アップは、S だけなら M、M だけなら L、S と M の両方なら M が L になります。下の一覧で1匹ずつ切り替えることもできます。</p>
   </section>
 
   <section id="list-section" hidden>
@@ -68,6 +71,7 @@
 <script src="data/pokemon.js"></script>
 <script src="data/dict.js"></script>
 <script src="data/icons.js"></script>
+<script src="data/evolution.js"></script>
 <script src="js/match.js"></script>
 <script src="js/csv.js"></script>
 <script src="js/reader.js"></script>

@@ -89,6 +89,58 @@ eq('引用符入りの名前', Csv.escape('a"b'), '"a""b"');
 eq('改行は空白に', Csv.escape('a\nb'), 'a b');
 eq('普通の名前はそのまま', Csv.escape('たろう'), 'たろう');
 
+// 銀種
+const C = '最大所持数アップ';
+const seed = (...s) => Match.applySeed([...s, '', '', '', '', ''].slice(0, 5)).filter(Boolean);
+eq('〇〇S のみ → 〇〇M', seed('スキル確率アップS'), ['スキル確率アップM']);
+eq('〇〇S と 〇〇M → 変化なし', seed('スキル確率アップS', 'スキル確率アップM'), ['スキル確率アップS', 'スキル確率アップM']);
+eq('最大所持数S のみ → M', seed(C + 'S'), [C + 'M']);
+eq('最大所持数M のみ → L', seed(C + 'M'), [C + 'L']);
+eq('最大所持数S と M → S と L', seed(C + 'S', C + 'M'), [C + 'S', C + 'L']);
+eq('最大所持数L のみ → 変化なし', seed(C + 'L'), [C + 'L']);
+eq('最大所持数S と L → 変化なし', seed(C + 'S', C + 'L'), [C + 'S', C + 'L']);
+eq('最大所持数M と L → 変化なし', seed(C + 'M', C + 'L'), [C + 'M', C + 'L']);
+eq('最大所持数S と M と L → 変化なし', seed(C + 'S', C + 'M', C + 'L'), [C + 'S', C + 'M', C + 'L']);
+eq('Mのない〇〇S は変化なし', seed('きのみの数S'), ['きのみの数S']);
+eq('金のサブスキル(M なし)は変化なし', seed('おてつだいボーナス', 'ゆめのかけらボーナス'), ['おてつだいボーナス', 'ゆめのかけらボーナス']);
+eq('空の枠は空のまま', Match.applySeed(['', '', '', '', '']), ['', '', '', '', '']);
+eq('位置は変わらない', Match.applySeed(['スキル確率アップS', '', 'おてつだいスピードS', '', C + 'M']), ['スキル確率アップM', '', 'おてつだいスピードM', '', C + 'L']);
+eq('実際の並び', Match.applySeed(['スキル確率アップS', 'おてつだいスピードM', C + 'M', '食材確率アップS', 'おてつだいボーナス']),
+  ['スキル確率アップM', 'おてつだいスピードM', C + 'L', '食材確率アップM', 'おてつだいボーナス']);
+eq('銀種を使うと CSV は変化後', Csv.build([row({ seed: true, sub: ['スキル確率アップS', '', '', '', ''] })]).split(/\r?\n/)[1].split(',').slice(8, 13), ['スキル確率アップM', '', '', '', '']);
+eq('銀種を使わなければ CSV はそのまま', Csv.build([row({ seed: false, sub: ['スキル確率アップS', '', '', '', ''] })]).split(/\r?\n/)[1].split(',').slice(8, 13), ['スキル確率アップS', '', '', '', '']);
+
+// 進化の系統
+const inLines = POKEMON.map((p) => p.name).filter((n) => Match.line(n).includes(n));
+eq('全種族がどれかの系統に入る', inLines.length, POKEMON.length);
+eq('進化の登録は辞書にある種族だけ', Object.entries(EVOLVES_TO).flatMap(([a, b]) => [a, ...b]).filter((n) => !Match.find(n)), []);
+eq('系統は1つの根から広がる(進化元が2つの種族がない)',
+  Object.values(EVOLVES_TO).flat().filter((n, i, all) => all.indexOf(n) !== i), []);
+eq('フシギダネの系統', Match.line('フシギバナ'), ['フシギダネ', 'フシギソウ', 'フシギバナ']);
+eq('ピカチュウの系統は進化前を含む', Match.line('ピカチュウ'), ['ピチュー', 'ピカチュウ', 'ライチュウ']);
+eq('イベントのピカチュウは進化しない', Match.line('ピカチュウ(ホリデー)'), ['ピカチュウ(ホリデー)']);
+eq('分岐の系統(ヤドン)', Match.line('ヤドン'), ['ヤドン', 'ヤドラン', 'ヤドキング']);
+eq('イーブイは9種の系統', Match.line('イーブイ').length, 9);
+eq('一本道の最終進化形', Match.finals('フシギダネ'), ['フシギバナ']);
+eq('途中からの最終進化形', Match.finals('フシギソウ'), ['フシギバナ']);
+eq('最終進化形は自分自身', Match.finals('フシギバナ'), ['フシギバナ']);
+eq('分岐は複数の最終進化形(ヤドン)', Match.finals('ヤドン'), ['ヤドラン', 'ヤドキング']);
+eq('分岐は複数の最終進化形(キルリア)', Match.finals('キルリア'), ['サーナイト', 'エルレイド']);
+eq('ラルトスの最終進化形は2つ', Match.finals('ラルトス'), ['サーナイト', 'エルレイド']);
+eq('ウパーの2つの姿は別の系統', [Match.finals('ウパー'), Match.finals('ウパー(パルデア)')], [['ヌオー'], ['ドオー']]);
+eq('進化しない種族', Match.finals('ミュウ'), ['ミュウ']);
+eq('子孫(フシギダネ)', Match.descendants('フシギダネ'), ['フシギソウ', 'フシギバナ']);
+
+// スキルレベルの読み取り
+eq('「71」は最後の1桁を使う', Match.skillLevelFrom('71'), 1);
+eq('1桁はそのまま', Match.skillLevelFrom('6'), 6);
+eq('9は範囲外', Match.skillLevelFrom('9'), null);
+eq('0は範囲外', Match.skillLevelFrom('0'), null);
+eq('読めなければ null', Match.skillLevelFrom(''), null);
+eq('スキルレベル71は出力を止める', Match.checkRow(row({ skillLevel: 71 })).errors.length, 1);
+eq('スキルレベル0は出力を止める', Match.checkRow(row({ skillLevel: 0 })).errors.length, 1);
+eq('スキルレベル8は通る', Match.checkRow(row({ skillLevel: 8 })).errors.length, 0);
+
 const failed = results.filter((r) => !r.ok);
 document.getElementById('out').textContent =
   `${results.length}件中 ${results.length - failed.length}件成功\n` +

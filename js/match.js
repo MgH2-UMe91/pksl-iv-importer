@@ -116,6 +116,60 @@ const Match = (() => {
     return { ing: [a, second, opts[0].g], low };
   }
 
+  // ---------- 銀種(サブスキルのたね) ----------
+  // 通常のサブスキルは S → M。同じ名前の M をすでに持っていれば、S は S のまま。
+  // 最大所持数アップは、S だけなら M、M だけなら L、S と M の両方なら M が L になり S は S のまま。
+  // 決めていない組み合わせ(L を持っている場合など)は変えない
+  const CARRY = '最大所持数アップ';
+  function applySeed(sub) {
+    const has = new Set(sub.filter(Boolean));
+    const carryS = has.has(CARRY + 'S'), carryM = has.has(CARRY + 'M'), carryL = has.has(CARRY + 'L');
+    return sub.map((name) => {
+      if (name === CARRY + 'S') return carryS && !carryM && !carryL ? CARRY + 'M' : name;
+      if (name === CARRY + 'M') return carryM && !carryL && !carryS ? CARRY + 'L' : carryS && !carryL ? CARRY + 'L' : name;
+      const up = name.endsWith('S') && !name.startsWith(CARRY) ? name.slice(0, -1) + 'M' : '';
+      return up && SUBSKILLS.includes(up) && !has.has(up) ? up : name;
+    });
+  }
+
+  // CSV に出すサブスキル。銀種を使う個体は変化後
+  const effectiveSub = (row) => (row.seed ? applySeed(row.sub) : row.sub);
+
+  // ---------- 進化の系統 ----------
+  // 進化元 → 進化先は data/evolution.js。その種族が属する系統を、進化の浅い順に並べて返す
+  const parentOf = {};
+  for (const [from, tos] of Object.entries(EVOLVES_TO)) for (const to of tos) parentOf[to] = from;
+  const evolvesTo = (name) => EVOLVES_TO[name] ?? [];
+
+  function line(name) {
+    let root = name;
+    while (parentOf[root]) root = parentOf[root];
+    const out = [], queue = [root];
+    while (queue.length) { const n = queue.shift(); out.push(n); queue.push(...evolvesTo(n)); }
+    return out.filter((n) => find(n));
+  }
+
+  // その種族から進化して行き着く先すべて(自分は含まない)
+  function descendants(name) {
+    const out = [];
+    for (const n of evolvesTo(name)) out.push(n, ...descendants(n));
+    return out;
+  }
+
+  // 最終進化形。分岐があれば複数になる。進化しない種族は自分自身
+  function finals(name) {
+    const next = evolvesTo(name).filter((n) => find(n));
+    return next.length ? next.flatMap(finals) : [name];
+  }
+
+  // 読み取った文字からスキルレベルを取り出す。1桁で1〜8だけを認める。
+  // 「Lv.1」の「v」が「7」と読まれて「71」になることがあるので、最後の1桁だけを使う
+  function skillLevelFrom(text) {
+    const m = String(text ?? '').match(/(\d)$/);
+    const n = m ? Number(m[1]) : null;
+    return n >= 1 && n <= 8 ? n : null;
+  }
+
   const speciesNames = POKEMON.map((p) => p.name);
   const baseName = (name) => name.replace(/\(.*$/, '');
 
@@ -150,6 +204,7 @@ const Match = (() => {
   function checkRow(row) {
     const errors = [], warnings = [];
     if (!find(row.species)) errors.push('ポケモンを選んでください');
+    if (row.pending) errors.push(`進化先を選んでください(${finals(row.shown).join('、')})`);
     if (!Number.isInteger(row.level) || row.level < 1 || row.level > 100) errors.push('レベルは1〜100で指定してください');
     if (row.skillLevel !== '' && row.skillLevel !== undefined && (!Number.isInteger(row.skillLevel) || row.skillLevel < 1 || row.skillLevel > 8)) errors.push('スキルレベルは1〜8で指定してください');
     if (row.nature && !NATURES.includes(row.nature)) errors.push(`性格「${row.nature}」は辞書にありません`);
@@ -170,5 +225,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { fold, distance, best, species, nature, subskill, ingredients, combos, ingredientsOf, search, checkRow, find };
+  return { fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, applySeed, effectiveSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();

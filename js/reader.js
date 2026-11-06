@@ -147,6 +147,19 @@ const Reader = (() => {
     return null;
   }
 
+  // 「Lv.1」の数字だけを読む。スキルレベルは1桁(1〜8)。
+  // 切り抜きの幅で読み取りが揺れる。狭いと細い「1」が「5」になり、広いと「Lv.」の「v」が「7」になって「71」になる。
+  // 幅を変えて5回読み、最後の1桁の多数決で決める。2回以上そろわなければ読めなかったことにする
+  async function readSkillLevel(P, digits, x, y) {
+    const W = P.W, votes = new Map();
+    for (const [dx, h] of [[0.014, 60], [0.012, 96], [0.018, 44], [0.026, 60], [0.03, 44]]) {
+      const n = Match.skillLevelFrom(await ocr(digits, cropText(P, x - W * dx, y - W * 0.018, x + W * dx, y + W * 0.018, h)));
+      if (n !== null) votes.set(n, (votes.get(n) ?? 0) + 1);
+    }
+    const ranked = [...votes].sort((p, q) => q[1] - p[1]);
+    return ranked.length && ranked[0][1] >= 2 && (ranked.length === 1 || ranked[0][1] > ranked[1][1]) ? ranked[0][0] : null;
+  }
+
   function iconOf(P, card) {
     const { W } = P, h = card.b - card.a;
     const c = document.createElement('canvas');
@@ -173,8 +186,8 @@ const Reader = (() => {
     res.name = await ocr(jpn, cropText(P, nx + W * 0.008, ny0, W * 0.56, ny1));
 
     // メインスキルのレベル: 枠の右上の「Lv.1」の数字だけを読む。見出しの下端からの距離は一定
-    res.skillLevel = await readAmount(P, digits, W * 0.893, skill.b + W * 0.1277, 0.018);
-    if (res.skillLevel === null) res.warnings.push('スキルレベルを読めませんでした');
+    res.skillLevel = await readSkillLevel(P, digits, W * 0.893, skill.b + W * 0.1277);
+    if (res.skillLevel === null) res.warnings.push('スキルレベルを読めませんでした(1〜8で入れてください)');
 
     // サブスキル: 2列3段。メインスキルの枠の下端からの距離は説明文の行数によらない
     for (let i = 0; i < 5; i++) {

@@ -5,14 +5,16 @@ const LEVELS = [30, 50, 60, 70, 80];
 const SKILL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8];
 const $ = (id) => document.getElementById(id);
 
-const state = { rows: [], bulkLevel: 60, bulkSkill: null, nextId: 1 }; // bulkSkill が null なら読み取った値を使う
+const state = { rows: [], bulkLevel: 60, bulkSkill: null, bulkSeed: false, nextId: 1 }; // bulkSkill が null なら読み取った値を使う
 
 function newRow(image = null) {
   return {
     id: state.nextId++, image,
     nickname: '', species: '', level: state.bulkLevel, skillLevel: '', readSkill: '',
-    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false,
+    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, seed: state.bulkSeed,
     low: new Set(), candidates: [], clues: null, icon: '', notes: [],
+    shown: '',        // スクショに写っている種族。進化を選んでも変わらない(見本の保存と「進化する」の基準)
+    pending: false,   // 「進化する」を入れたが、分岐があって進化先が決まっていない
   };
 }
 
@@ -20,6 +22,7 @@ function newRow(image = null) {
 function applyReading(row, read) {
   const sp = Match.species(read.name);
   row.species = sp.species;
+  row.shown = sp.confidence === 'high' ? sp.species : '';
   row.nickname = sp.nickname;
   row.candidates = sp.candidates;
   if (sp.confidence === 'low') row.low.add('species');
@@ -28,6 +31,7 @@ function applyReading(row, read) {
   row.nature = take('nature', Match.nature(read.nature));
   row.sub = read.sub.map((t, i) => take(`sub${i}`, Match.subskill(t, read.subColor[i])));
   row.skillLevel = row.readSkill = read.skillLevel ?? '';
+  if (read.skillLevel === null) row.low.add('skillLevel'); // 読めないときは黄色にして確認を促す
   row.clues = read.clues;
   row.icon = read.icon;
   row.notes = read.warnings;
@@ -89,6 +93,21 @@ function showCombos(button, row) {
   button.parentElement.append(ul);
 }
 
+// 進化の選択。系統に複数の種族があるときだけ出す。「進化する」は、スクショの種族から最終進化形へ切り替える
+function evolutionField(row) {
+  const names = Match.line(row.species);
+  if (names.length < 2) return '';
+  const opts = names.map((n) => `<option value="${esc(n)}"${n === row.species ? ' selected' : ''}>${esc(n)}</option>`).join('');
+  const from = Match.find(row.shown) ? row.shown : row.species;
+  const canEvolve = Match.descendants(from).length > 0;
+  const on = Match.descendants(from).includes(row.species) || row.pending;
+  return `<div class="field evo${row.pending ? ' missing' : ''}" data-key="evolution">
+      <span>進化</span>
+      <select data-evo aria-label="進化の系統から選ぶ">${opts}</select>
+      <label class="check"><input type="checkbox" data-evolve${on ? ' checked' : ''}${canEvolve ? '' : ' disabled'}>進化する</label>
+    </div>`;
+}
+
 function rowHtml(row) {
   const own = Match.ingredientsOf(row.species) ?? INGREDIENTS;
   const thumb = row.image
@@ -100,13 +119,16 @@ function rowHtml(row) {
       <div class="field" data-key="species"><span>ポケモン</span>
         <input type="text" data-species value="${esc(row.species)}" placeholder="名前で検索" autocomplete="off">
       </div>
+      ${evolutionField(row)}
       <label class="field"><span>ニックネーム</span><input type="text" data-edit="nickname" value="${esc(row.nickname)}"></label>
       <label class="field"><span>レベル</span><input type="number" data-edit="level" min="1" max="100" value="${Number.isNaN(row.level) ? '' : row.level}"></label>
-      <label class="field"><span>スキルレベル</span><input type="number" data-edit="skillLevel" min="1" max="8" value="${row.skillLevel}"></label>
+      <label class="field" data-key="skillLevel"><span>スキルレベル</span><input type="number" data-edit="skillLevel" min="1" max="8" value="${row.skillLevel}"></label>
       ${selectField('性格', 'nature', row.nature, NATURES)}
       ${ingredientField(row, own)}
       ${row.sub.map((s, i) => selectField(`サブスキル${i + 1}`, `sub${i}`, s, SUBSKILLS)).join('')}
       <label class="check"><input type="checkbox" data-edit="shiny"${row.shiny ? ' checked' : ''}>色違い</label>
+      <label class="check"><input type="checkbox" data-edit="seed"${row.seed ? ' checked' : ''}>銀種を使う</label>
+      <p class="field wide seed-note note" hidden></p>
     </div>
     <ul class="messages"></ul>
     <div class="row-end"><button class="remove" type="button" data-remove>この行を削除</button></div>`;
@@ -138,11 +160,20 @@ function refresh() {
     const { errors, warnings } = Match.checkRow(row);
     const el = $('rows').querySelector(`[data-id="${row.id}"]`);
     for (const f of el.querySelectorAll('[data-key]')) f.classList.toggle('low', row.low.has(f.dataset.key));
+    const after = Match.effectiveSub(row);
+    const changed = row.sub.map((s, k) => (s !== after[k] ? `${s} → ${after[k]}` : '')).filter(Boolean);
+    const seedNote = el.querySelector('.seed-note');
+    seedNote.hidden = !row.seed;
+    seedNote.textContent = changed.length ? `銀種でサブスキルが変わります: ${changed.join('、')}` : '銀種を使っても、変わるサブスキルはありません。';
     el.querySelector('[data-key="species"]').classList.toggle('missing', !row.species);
     const notes = [...row.notes.map((t) => ['warning', t]), ...warnings.map((t) => ['warning', t]), ...errors.map((t) => ['error', t])];
     el.querySelector('.messages').innerHTML = notes.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('');
     for (const e of errors) problems.push(`${i + 1}匹目: ${e}`);
   });
+
+  const bulk = $('seed-all');
+  bulk.checked = has && state.rows.every((r) => r.seed);
+  bulk.indeterminate = state.rows.some((r) => r.seed) && !bulk.checked;
 
   const ok = has && problems.length === 0;
   $('summary').textContent = ok ? `${state.rows.length}匹を出力できます。` : `${state.rows.length}匹のうち、直す項目が${problems.length}件あります。`;
@@ -160,6 +191,15 @@ function setLevel(level) {
   refresh();
 }
 
+function setSeedAll(on) {
+  state.bulkSeed = on;
+  for (const row of state.rows) {
+    row.seed = on;
+    $('rows').querySelector(`[data-id="${row.id}"] [data-edit="seed"]`).checked = on;
+  }
+  refresh();
+}
+
 function setSkillLevel(level) {
   state.bulkSkill = level;
   for (const row of state.rows) {
@@ -170,8 +210,31 @@ function setSkillLevel(level) {
   refresh();
 }
 
+// 進化の系統から選ぶ。食材の名前は引き継ぎ、新しい種族に合わないものだけ空にする
+function evolveTo(row, name) {
+  row.species = name;
+  row.pending = false;
+  const p = Match.find(name);
+  const own = p.myth ?? p.ing;
+  row.ing = row.ing.map((g) => (own.includes(g) ? g : ''));
+  if (!p.myth) row.ing[0] = p.ing[0];
+  if (row.ing[1] && row.ing[1] === p.ing[2]) row.ing[1] = '';
+  renderRow(row);
+}
+
+// 「進化する」。分岐がなければ最終進化形へ、あれば進化先を選ぶまで出力を止める。外すとスクショの種族に戻る
+function setEvolve(row, on) {
+  const from = Match.find(row.shown) ? row.shown : row.species;
+  if (!on) { row.pending = false; evolveTo(row, from); return; }
+  const finals = Match.finals(from);
+  if (finals.length === 1) evolveTo(row, finals[0]);
+  else { row.pending = true; row.species = from; renderRow(row); }
+}
+
 function setSpecies(row, name) {
   row.species = name;
+  row.shown = name;
+  row.pending = false;
   row.low.delete('species');
   row.candidates = [];
   const p = Match.find(name);
@@ -233,6 +296,7 @@ function onEdit(ev) {
   if (key === 'level') row.level = t.value === '' ? NaN : Number(t.value);
   else if (key === 'skillLevel') row.skillLevel = t.value === '' ? '' : Number(t.value);
   else if (key === 'shiny') row.shiny = t.checked;
+  else if (key === 'seed') row.seed = t.checked;
   else if (/^ing\d$/.test(key)) row.ing[key[3]] = t.value;
   else if (/^sub\d$/.test(key)) row.sub[key[3]] = t.value;
   else row[key] = t.value;
@@ -259,6 +323,8 @@ function init() {
     $('skill-levels').append(b);
   }
 
+  $('seed-all').addEventListener('change', (ev) => setSeedAll(ev.target.checked));
+
   $('files').addEventListener('change', async (ev) => {
     await addFiles(ev.target.files);
     ev.target.value = '';
@@ -268,10 +334,16 @@ function init() {
   const rows = $('rows');
   rows.addEventListener('input', onEdit);
   rows.addEventListener('change', onEdit);
+  rows.addEventListener('change', (ev) => {
+    if (ev.target.matches('[data-evo]')) evolveTo(rowOf(ev.target), ev.target.value);
+    else if (ev.target.matches('[data-evolve]')) setEvolve(rowOf(ev.target), ev.target.checked);
+  });
   rows.addEventListener('input', (ev) => {
     if (!ev.target.matches('[data-species]')) return;
     const row = rowOf(ev.target);
-    row.species = Match.find(ev.target.value) ? ev.target.value : '';
+    const typed = Match.find(ev.target.value) ? ev.target.value : '';
+    if (typed !== row.species) { row.shown = ''; row.pending = false; } // 入力が変わったら、確定は離れたときに行う
+    row.species = typed;
     showChoices(ev.target, row);
     refresh();
   });
@@ -280,7 +352,7 @@ function init() {
     if (!ev.target.matches('[data-species]')) return;
     closeChoices();
     const row = rowOf(ev.target);
-    if (Match.find(ev.target.value)) setSpecies(row, ev.target.value);
+    if (Match.find(ev.target.value) && (ev.target.value !== row.species || !row.shown)) setSpecies(row, ev.target.value);
   });
   document.addEventListener('click', (ev) => {
     const open = ev.target.closest('[data-combo-open]');

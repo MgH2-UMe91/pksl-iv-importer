@@ -14,7 +14,7 @@ const Csv = (() => {
     return [
       row.nickname, row.species, row.level, row.skillLevel ?? '',
       row.ing[0], row.ing[1], row.ing[2], row.nature,
-      row.sub[0], row.sub[1], row.sub[2], row.sub[3], row.sub[4],
+      ...Match.effectiveSub(row),
       row.shiny ? 1 : 0,
     ].map(escape).join(',');
   }
