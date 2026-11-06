@@ -89,14 +89,15 @@ input[type="text"], input[type="number"], select, textarea {
 
 textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; margin-top: 8px; }
 
-.row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 12px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-}
+.row { padding: 12px 0; border-top: 1px solid var(--line); }
 .row:first-child { border-top: 0; }
+.head { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; margin-bottom: 8px; align-items: start; }
+.head-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.head-fields .evo { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.head-fields .evo select { flex: 0 1 260px; min-width: 0; }
+@media (min-width: 481px) {
+  .head-fields .evo { order: 3; }
+}
 .thumb { width: 96px; }
 .thumb img { width: 100%; border-radius: 6px; display: block; }
 .thumb .empty {
@@ -158,18 +159,40 @@ textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; m
 .pic b { font-size: 0.8rem; font-weight: 600; margin-left: 2px; }
 .slot small { display: block; font-size: 0.68rem; line-height: 1.2; color: var(--muted); overflow-wrap: anywhere; }
 
-.messages { grid-column: 1 / -1; font-size: 0.85rem; margin: 0; padding: 0; list-style: none; }
+.messages { font-size: 0.85rem; margin: 6px 0 0; padding: 0; list-style: none; }
 .messages .error { color: var(--error); }
 .messages .warning { color: var(--muted); }
-.row-end { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
-.remove { min-height: 36px; padding: 4px 12px; font-size: 0.85rem; }
+.foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.remove { min-height: 40px; padding: 4px 12px; font-size: 0.85rem; }
 
 #problems { margin: 8px 0; padding-left: 1.2em; color: var(--error); font-size: 0.9rem; }
 #problems:empty { display: none; }
 
 @media (max-width: 480px) {
-  .row { grid-template-columns: minmax(0, 1fr); }
-  .thumb { width: 96px; }
+  header, main { padding: 12px; }
+  header { padding-bottom: 8px; }
+  h1 { font-size: 1.15rem; margin: 4px 0; }
+  header p { font-size: 0.85rem; line-height: 1.5; }
+  section { padding: 12px; margin-bottom: 10px; }
+  h2 { font-size: 1.05rem; margin-bottom: 6px; }
+  h3 { font-size: 0.9rem; margin: 10px 0 4px; }
+  h3 small { font-weight: 400; color: var(--muted); font-size: 0.78rem; }
+  .note { font-size: 0.82rem; line-height: 1.5; margin-top: 6px; }
+  /* 絵を小さくして、ポケモンとニックネームを右に積む */
+  .head { grid-template-columns: 64px minmax(0, 1fr); gap: 10px; margin-bottom: 6px; }
+  .head-fields { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .thumb { width: 64px; }
+  .thumb .empty { height: 64px; font-size: 0.65rem; }
+  .row { padding: 10px 0; }
+  .fields { gap: 4px 8px; }
+  .field > span { font-size: 0.75rem; line-height: 1.3; }
+  /* 名前が長い選択欄は、見出しを左に置いて1行にする */
+  .field.long { display: grid; grid-template-columns: 3.6em minmax(0, 1fr); align-items: center; gap: 0 6px; }
+  .field.long > span { font-size: 0.78rem; }
+  .field.evo { display: flex; align-items: center; gap: 8px; }
+  .field.evo select { flex: 1 1 auto; min-width: 0; }
+  .field.evo .check { min-height: 40px; white-space: nowrap; }
+  .seed-note { font-size: 0.78rem; }
 }
 
 /* 進化の選択 */
@@ -197,3 +220,32 @@ textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; m
 .unresolved-list img, .unresolved-list .noimg { width: 48px; height: 48px; flex: none; border-radius: 6px; object-fit: cover; }
 .unresolved-list .noimg { display: grid; place-items: center; border: 1px dashed var(--line); color: var(--muted); font-size: 0.65rem; text-align: center; }
 .unresolved-list .nick { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+
+/* 一括指定のボタン: 数字だけにして1行に収める。スキルレベルは5つずつの2行 */
+.chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.chips button { padding: 6px 4px; min-width: 0; }
+@media (min-width: 641px) {
+  .chips { display: flex; flex-wrap: wrap; }
+  .chips button { min-width: 56px; padding: 9px 16px; }
+}
+
+/* 説明の開閉 */
+details.rule summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; min-height: 32px; display: flex; align-items: center; }
+details.rule .note { margin: 0 0 4px; }
+
+/* 種族の一括選択: 検索欄と適用ボタンを1行に */
+.apply-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.apply-line .field { position: relative; }
+.unresolved .actions { align-items: center; }
+.unresolved .actions .note { margin: 0 0 0 auto; }
+
+/* エクスポートのボタンは1行に */
+.export-actions { flex-wrap: wrap; }
+.export-actions > * { flex: 1 1 auto; text-align: center; }
+@media (max-width: 480px) {
+  button, .button { padding: 8px 10px; }
+  .export-actions { gap: 6px; }
+  .unresolved { padding: 10px; gap: 6px; }
+  .unresolved-list { max-height: 240px; }
+  .unresolved-list label { min-height: 52px; }
+}

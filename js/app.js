@@ -103,7 +103,6 @@ function evolutionField(row) {
   const canEvolve = Match.descendants(from).length > 0;
   const on = Match.descendants(from).includes(row.species) || row.pending;
   return `<div class="field evo${row.pending ? ' missing' : ''}" data-key="evolution">
-      <span>進化</span>
       <select data-evo aria-label="進化の系統から選ぶ">${opts}</select>
       <label class="check"><input type="checkbox" data-evolve${on ? ' checked' : ''}${canEvolve ? '' : ' disabled'}>進化する</label>
     </div>`;
@@ -115,24 +114,30 @@ function rowHtml(row) {
     ? `<a href="${row.image}" target="_blank" rel="noopener"><img src="${row.icon || row.image}" alt="元のスクショを開く"></a>`
     : '<div class="empty">画像なし</div>';
   return `
-    <div class="thumb">${thumb}</div>
-    <div class="fields">
-      <div class="field" data-key="species"><span>ポケモン</span>
-        <input type="text" data-species value="${esc(row.species)}" placeholder="名前で検索" autocomplete="off">
+    <div class="head">
+      <div class="thumb">${thumb}</div>
+      <div class="head-fields">
+        <div class="field" data-key="species"><span>ポケモン</span>
+          <input type="text" data-species value="${esc(row.species)}" placeholder="名前で検索" autocomplete="off">
+        </div>
+        ${evolutionField(row)}
+        <label class="field"><span>ニックネーム</span><input type="text" data-edit="nickname" value="${esc(row.nickname)}"></label>
       </div>
-      ${evolutionField(row)}
-      <label class="field"><span>ニックネーム</span><input type="text" data-edit="nickname" value="${esc(row.nickname)}"></label>
+    </div>
+    <div class="fields">
       <label class="field"><span>レベル</span><input type="number" data-edit="level" min="1" max="100" value="${Number.isNaN(row.level) ? '' : row.level}"></label>
       <label class="field" data-key="skillLevel"><span>スキルレベル</span><input type="number" data-edit="skillLevel" min="1" max="8" value="${row.skillLevel}"></label>
       ${selectField('性格', 'nature', row.nature, NATURES)}
-      ${ingredientField(row, own)}
-      ${row.sub.map((s, i) => selectField(`サブスキル${i + 1}`, `sub${i}`, s, SUBSKILLS, true)).join('')}
       <label class="check"><input type="checkbox" data-edit="shiny"${row.shiny ? ' checked' : ''}>色違い</label>
-      <label class="check"><input type="checkbox" data-edit="seed"${row.seed ? ' checked' : ''}>銀種を使う</label>
+      ${ingredientField(row, own)}
+      ${row.sub.map((s, i) => selectField(`サブ${i + 1}`, `sub${i}`, s, SUBSKILLS, true)).join('')}
+      <div class="foot">
+        <label class="check"><input type="checkbox" data-edit="seed"${row.seed ? ' checked' : ''}>銀種を使う</label>
+        <button class="remove" type="button" data-remove>この行を削除</button>
+      </div>
       <p class="field wide seed-note note" hidden></p>
     </div>
-    <ul class="messages"></ul>
-    <div class="row-end"><button class="remove" type="button" data-remove>この行を削除</button></div>`;
+    <ul class="messages"></ul>`;
 }
 
 function addRow(row) {
@@ -167,8 +172,8 @@ function updateBulkApply() {
   const n = unresolvedRows().filter((r) => r.picked).length;
   const name = state.bulkSpecies;
   $('unresolved-apply').disabled = !(n > 0 && Match.find(name));
-  $('unresolved-apply').textContent = n > 0 && name ? `選んだ${n}匹を${name}にする` : '選んだ個体に適用';
-  $('unresolved-pick-count').textContent = `${n} / ${unresolvedRows().length}匹を選択中`;
+  $('unresolved-apply').textContent = n > 0 ? `${n}匹に適用` : '適用';
+  $('unresolved-pick-count').textContent = `${n} / ${unresolvedRows().length}匹`;
 }
 
 let unresolvedSignature = '';
@@ -222,10 +227,10 @@ function refresh() {
     const el = $('rows').querySelector(`[data-id="${row.id}"]`);
     for (const f of el.querySelectorAll('[data-key]')) f.classList.toggle('low', row.low.has(f.dataset.key));
     const after = Match.effectiveSub(row);
-    const changed = row.sub.map((s, k) => (s !== after[k] ? `${s} → ${after[k]}` : '')).filter(Boolean);
+    const changed = row.sub.map((s, k) => (s !== after[k] ? `${s}→${after[k].slice(-1)}` : '')).filter(Boolean);
     const seedNote = el.querySelector('.seed-note');
     seedNote.hidden = !row.seed;
-    seedNote.textContent = changed.length ? `銀種でサブスキルが変わります: ${changed.join('、')}` : '銀種を使っても、変わるサブスキルはありません。';
+    seedNote.textContent = changed.length ? `銀種で変わる: ${changed.join('、')}` : '銀種を使っても変わりません。';
     el.querySelector('[data-key="species"]').classList.toggle('missing', !row.species);
     const notes = [...row.notes.map((t) => ['warning', t]), ...warnings.map((t) => ['warning', t]), ...errors.map((t) => ['error', t])];
     el.querySelector('.messages').innerHTML = notes.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('');
@@ -247,7 +252,7 @@ function refresh() {
 function setLevel(level) {
   state.bulkLevel = level;
   for (const row of state.rows) row.level = level;
-  for (const b of $('levels').children) b.classList.toggle('selected', Number(b.textContent.slice(2)) === level);
+  for (const b of $('levels').children) b.classList.toggle('selected', Number(b.textContent) === level);
   for (const input of document.querySelectorAll('[data-edit="level"]')) input.value = level;
   refresh();
 }
@@ -368,7 +373,7 @@ function init() {
   for (const level of LEVELS) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = `Lv${level}`;
+    b.textContent = String(level);
     b.classList.toggle('selected', level === state.bulkLevel);
     b.addEventListener('click', () => setLevel(level));
     $('levels').append(b);
@@ -377,8 +382,9 @@ function init() {
   for (const level of [null, ...SKILL_LEVELS]) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = level === null ? '読み取り値' : `Lv${level}`;
+    b.textContent = level === null ? '読取' : String(level);
     b.dataset.level = String(level);
+    if (level === null) b.setAttribute('aria-label', '読み取った値');
     b.classList.toggle('selected', level === null);
     b.addEventListener('click', () => setSkillLevel(level));
     $('skill-levels').append(b);

@@ -15,7 +15,7 @@
 <body>
 <header>
   <h1>スクショ取り込みツール for 個体値計算機</h1>
-  <p>ポケモンスリープの詳細画面のスクショから、「個体値計算機 for ポケモンスリープ」のボックスへ取り込める CSV を作ります。画像は端末の外へ送りません。非公式のファンツールです。</p>
+  <p>ポケモンスリープの詳細画面のスクショから、個体値計算機のボックスへ取り込める CSV を作ります。画像は端末の外へ送りません。非公式のファンツールです。</p>
 </header>
 
 <main>
@@ -29,35 +29,35 @@
   </section>
 
   <section id="level-section" hidden>
-    <h2>2. レベルを一括指定する</h2>
+    <h2>2. 全員に一括で指定する</h2>
     <h3>レベル</h3>
-    <div id="levels" class="actions"></div>
-    <p class="note">全員のレベルを書き換えます。個別の変更は下の一覧でできます。</p>
-    <h3>スキルレベル</h3>
-    <div id="skill-levels" class="actions"></div>
-    <p class="note">全員のスキルレベルを書き換えます。「読み取り値」で画面から読んだ値に戻せます。</p>
+    <div id="levels" class="chips"></div>
+    <h3>スキルレベル <small>(読取 = 画面から読んだ値)</small></h3>
+    <div id="skill-levels" class="chips"></div>
     <h3>銀種</h3>
     <label class="check"><input id="seed-all" type="checkbox">全員に銀種を使う</label>
-    <p class="note">サブスキルを銀種で上げた後の状態で CSV を作ります。通常のサブスキルは S が M になります(同じ名前の M をすでに持っていると変わりません)。最大所持数アップは、S だけなら M、M だけなら L、S と M の両方なら M が L になります。下の一覧で1匹ずつ切り替えることもできます。</p>
+    <details class="rule">
+      <summary>変わり方</summary>
+      <p class="note">サブスキルを銀種で上げた状態で CSV を作ります。通常のサブスキルは S が M になります(同じ名前の M をすでに持っていると変わりません)。最大所持数アップは、S だけなら M、M だけなら L、S と M の両方なら M が L になります(S は残ります)。1匹ずつの切り替えは、下の一覧でできます。</p>
+    </details>
   </section>
 
   <section id="list-section" hidden>
     <h2>3. 確認・編集する</h2>
-    <p class="note">黄色の項目は読み取りの自信が低いので確認してください。色違いは画面の文字に出ないので、手でチェックしてください。ニックネームを付けた個体は種族名が画面に出ないので、アイコンを見て種族を選んでください。</p>
+    <p class="note">黄色の項目は読み取りの自信が低いので確認してください。色違いは画面の文字に出ないので、手でチェックしてください。</p>
     <div id="unresolved" class="unresolved" hidden>
       <h3>種族が決まっていない個体</h3>
-      <p class="note">ニックネームを付けた個体は、種族名が画面に出ません。絵とニックネームを見て、同じ種族の個体にチェックを入れ、種族を選んでまとめて決められます。決めたあとは、1匹ずつ直せます。</p>
+      <p class="note">ニックネームの個体は種族名が画面に出ません。絵とニックネームを見て、同じ種族の個体にチェックを入れ、種族を選んでまとめて決められます。決めたあとも1匹ずつ直せます。</p>
       <ul id="unresolved-list" class="unresolved-list"></ul>
       <div class="actions">
         <button id="unresolved-all" type="button">全員を選ぶ</button>
         <button id="unresolved-none" type="button">選択を外す</button>
+        <span id="unresolved-pick-count" class="note" role="status"></span>
       </div>
-      <p id="unresolved-pick-count" class="note" role="status"></p>
-      <div class="field">
-        <span>種族</span>
-        <input id="unresolved-species" type="text" placeholder="名前で検索" autocomplete="off">
+      <div class="apply-line">
+        <div class="field"><input id="unresolved-species" type="text" placeholder="種族を名前で検索" autocomplete="off" aria-label="種族"></div>
+        <button id="unresolved-apply" class="primary" type="button" disabled>適用</button>
       </div>
-      <button id="unresolved-apply" class="primary" type="button" disabled>選んだ個体に適用</button>
     </div>
     <div id="rows"></div>
   </section>
@@ -66,16 +66,12 @@
     <h2>4. エクスポートする</h2>
     <p id="summary" role="status"></p>
     <ul id="problems"></ul>
-    <div class="actions">
+    <div class="actions export-actions">
       <button id="copy" class="primary" type="button">CSVをコピー</button>
-      <button id="save" type="button">ファイル保存</button>
+      <button id="save" type="button">保存</button>
       <a id="open" class="button" href="https://nitoyon.github.io/pokesleep-tool/iv/" target="_blank" rel="noopener">ツールを開く</a>
     </div>
-    <p class="note">ツールの「ボックス」タブの右上のメニューから「インポート」を選び、貼り付けて取り込みます。</p>
-    <ul class="note">
-      <li>ボックスの上限は300匹です。空きを超えた分は取り込まれません。</li>
-      <li>同じ CSV をもう一度取り込むと、同じポケモンが重複して登録されます。</li>
-    </ul>
+    <p class="note">ツールの「ボックス」タブ右上のメニューの「インポート」に貼り付けます。上限は300匹で、同じ CSV を2回取り込むと重複します。</p>
     <details>
       <summary>CSVの中身を見る</summary>
       <textarea id="preview" rows="8" readonly></textarea>
