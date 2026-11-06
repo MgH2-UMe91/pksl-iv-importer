@@ -369,7 +369,15 @@ function onEdit(ev) {
   refresh();
 }
 
+// ホーム画面のアプリとして開いたとき。画面全体ではなく中身だけをスクロールさせる(css の .standalone)
+function detectStandalone() {
+  if (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+    document.documentElement.classList.add('standalone');
+  }
+}
+
 function init() {
+  detectStandalone();
   for (const level of LEVELS) {
     const b = document.createElement('button');
     b.type = 'button';

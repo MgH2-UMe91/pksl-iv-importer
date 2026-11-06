@@ -249,3 +249,18 @@ details.rule .note { margin: 0 0 4px; }
   .unresolved-list { max-height: 240px; }
   .unresolved-list label { min-height: 52px; }
 }
+
+/* ホーム画面のアプリ(iPhone)のとき: ステータスバーの下をページ全体が通ると、システムが内容をぼかす。
+   ページ全体はスクロールさせず、ステータスバーの下の枠の中だけをスクロールさせて、
+   内容がステータスバーの下へ入らないようにする。先頭の見出しも、ぼかしの範囲から離す */
+html.standalone, html.standalone body { height: 100%; overflow: hidden; }
+html.standalone .app {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 28px);
+  padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+}
