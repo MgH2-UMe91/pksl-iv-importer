@@ -241,7 +241,14 @@ details.rule .note { margin: 0 0 4px; }
 
 /* エクスポートのボタンは1行に */
 .export-actions { flex-wrap: wrap; }
-.export-actions > * { flex: 1 1 auto; text-align: center; }
+.export-actions { flex-wrap: nowrap; }
+.export-actions > * { text-align: center; }
+/* 「CSVをコピー」をいちばん目立たせる */
+#copy { flex: 3 1 0; min-height: 54px; font-size: 1.1rem; font-weight: 600; }
+#save { flex: 1 1 0; min-height: 54px; }
+.open-note { line-height: 1.7; }
+@media (max-width: 480px) { .open-note { font-size: 0.78rem; } }
+.open-note a { display: inline-block; padding: 4px 0; font-size: 0.8rem; color: var(--muted); text-decoration: underline; }
 @media (max-width: 480px) {
   button, .button { padding: 8px 10px; }
   .export-actions { gap: 6px; }
