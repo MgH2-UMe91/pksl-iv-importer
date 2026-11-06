@@ -180,3 +180,20 @@ textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; m
 /* 銀種 */
 .seed-note { margin: 0; }
 .seed-note[hidden] { display: none; }
+
+/* 名前が長い選択欄(サブスキル、食材)は、狭い画面で1列に広げる */
+@media (max-width: 640px) {
+  .field.long { grid-column: 1 / -1; }
+}
+
+/* 種族が決まっていない個体の一括選択 */
+.unresolved { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; padding: 12px; border: 1px solid var(--low-line); border-radius: 8px; background: var(--bg); }
+.unresolved[hidden] { display: none; }
+.unresolved h3 { margin: 0; }
+.unresolved .note { margin: 0; }
+.unresolved-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 360px; overflow-y: auto; }
+.unresolved-list label { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); cursor: pointer; }
+.unresolved-list input { width: 22px; height: 22px; flex: none; }
+.unresolved-list img, .unresolved-list .noimg { width: 48px; height: 48px; flex: none; border-radius: 6px; object-fit: cover; }
+.unresolved-list .noimg { display: grid; place-items: center; border: 1px dashed var(--line); color: var(--muted); font-size: 0.65rem; text-align: center; }
+.unresolved-list .nick { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }

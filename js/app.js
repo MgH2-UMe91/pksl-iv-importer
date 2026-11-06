@@ -5,13 +5,13 @@ const LEVELS = [30, 50, 60, 70, 80];
 const SKILL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8];
 const $ = (id) => document.getElementById(id);
 
-const state = { rows: [], bulkLevel: 60, bulkSkill: null, bulkSeed: false, nextId: 1 }; // bulkSkill が null なら読み取った値を使う
+const state = { rows: [], bulkLevel: 60, bulkSkill: null, bulkSeed: false, bulkSpecies: '', nextId: 1 }; // bulkSkill が null なら読み取った値を使う
 
 function newRow(image = null) {
   return {
     id: state.nextId++, image,
     nickname: '', species: '', level: state.bulkLevel, skillLevel: '', readSkill: '',
-    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, seed: state.bulkSeed,
+    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, seed: state.bulkSeed, picked: false,
     low: new Set(), candidates: [], clues: null, icon: '', notes: [],
     shown: '',        // スクショに写っている種族。進化を選んでも変わらない(見本の保存と「進化する」の基準)
     pending: false,   // 「進化する」を入れたが、分岐があって進化先が決まっていない
@@ -46,10 +46,11 @@ function applyIngredients(row) {
   if (low.length) row.low.add('ing');
 }
 
-function selectField(label, key, value, options) {
+// long: 名前が長い選択欄。狭い画面では1列に広げて、名前の全体を読めるようにする
+function selectField(label, key, value, options, long = false) {
   const list = value && !options.includes(value) ? [value, ...options] : options;
   const opts = ['', ...list].map((o) => `<option value="${esc(o)}"${o === value ? ' selected' : ''}>${esc(o) || '(なし)'}</option>`).join('');
-  return `<label class="field" data-key="${key}"><span>${label}</span><select data-edit="${key}">${opts}</select></label>`;
+  return `<label class="field${long ? ' long' : ''}" data-key="${key}"><span>${label}</span><select data-edit="${key}">${opts}</select></label>`;
 }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -64,7 +65,7 @@ function ingredientField(row, own) {
   const p = Match.find(row.species);
   if (!p) return '<div class="field wide"><span>食材</span><p class="hint">ポケモンを選ぶと選べます</p></div>';
   // 幻のポケモンは組み合わせが多いので枠ごとに選ぶ
-  if (p.myth) return [0, 1, 2].map((i) => selectField(`食材${i + 1}`, `ing${i}`, row.ing[i], own)).join('');
+  if (p.myth) return [0, 1, 2].map((i) => selectField(`食材${i + 1}`, `ing${i}`, row.ing[i], own, true)).join('');
   const combos = Match.combos(row.species);
   const now = combos.find((c) => c.ing.join() === row.ing.join());
   return `<div class="field wide" data-key="ing"><span>食材</span>
@@ -125,7 +126,7 @@ function rowHtml(row) {
       <label class="field" data-key="skillLevel"><span>スキルレベル</span><input type="number" data-edit="skillLevel" min="1" max="8" value="${row.skillLevel}"></label>
       ${selectField('性格', 'nature', row.nature, NATURES)}
       ${ingredientField(row, own)}
-      ${row.sub.map((s, i) => selectField(`サブスキル${i + 1}`, `sub${i}`, s, SUBSKILLS)).join('')}
+      ${row.sub.map((s, i) => selectField(`サブスキル${i + 1}`, `sub${i}`, s, SUBSKILLS, true)).join('')}
       <label class="check"><input type="checkbox" data-edit="shiny"${row.shiny ? ' checked' : ''}>色違い</label>
       <label class="check"><input type="checkbox" data-edit="seed"${row.seed ? ' checked' : ''}>銀種を使う</label>
       <p class="field wide seed-note note" hidden></p>
@@ -151,7 +152,67 @@ function renderRow(row) {
   refresh();
 }
 
+// ---------- 種族が決まっていない個体の一括選択 ----------
+const unresolvedRows = () => state.rows.filter((r) => !r.species);
+
+// 選んだ個体すべてに同じ種族を入れる。1匹ずつ選んだときと同じ状態になる(食材などはそのあと選べる)
+function applySpecies(rows, name) {
+  for (const row of rows) {
+    row.picked = false;
+    setSpecies(row, name);
+  }
+}
+
+function updateBulkApply() {
+  const n = unresolvedRows().filter((r) => r.picked).length;
+  const name = state.bulkSpecies;
+  $('unresolved-apply').disabled = !(n > 0 && Match.find(name));
+  $('unresolved-apply').textContent = n > 0 && name ? `選んだ${n}匹を${name}にする` : '選んだ個体に適用';
+  $('unresolved-pick-count').textContent = `${n} / ${unresolvedRows().length}匹を選択中`;
+}
+
+let unresolvedSignature = '';
+function renderUnresolved() {
+  const list = unresolvedRows();
+  $('unresolved').hidden = list.length === 0;
+  if (!list.length) { unresolvedSignature = ''; return; }
+  // 他の欄を編集するたびに作り直さない(検索欄の入力やスクロールを保つ)
+  const signature = list.map((r) => `${r.id}:${r.picked}:${r.nickname}`).join('|');
+  if (signature !== unresolvedSignature) {
+    unresolvedSignature = signature;
+    $('unresolved-list').innerHTML = list.map((r) => `
+      <li><label>
+        <input type="checkbox" data-pick="${r.id}"${r.picked ? ' checked' : ''}>
+        ${r.icon ? `<img src="${r.icon}" alt="">` : '<span class="noimg">画像なし</span>'}
+        <span class="nick">${r.nickname ? esc(r.nickname) : '(ニックネームなし)'}</span>
+      </label></li>`).join('');
+  }
+  updateBulkApply();
+}
+
+function showBulkChoices(input) {
+  closeChoices();
+  const names = Match.search(input.value);
+  if (!names.length) return;
+  const ul = document.createElement('ul');
+  ul.className = 'choices';
+  for (const n of names) {
+    const li = document.createElement('li');
+    li.textContent = n;
+    li.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      closeChoices();
+      input.value = n;
+      state.bulkSpecies = n;
+      updateBulkApply();
+    });
+    ul.append(li);
+  }
+  input.parentElement.append(ul);
+}
+
 function refresh() {
+  renderUnresolved();
   const has = state.rows.length > 0;
   for (const id of ['level-section', 'list-section', 'export-section']) $(id).hidden = !has;
 
@@ -325,6 +386,38 @@ function init() {
 
   $('seed-all').addEventListener('change', (ev) => setSeedAll(ev.target.checked));
 
+  // 種族が決まっていない個体の一括選択
+  $('unresolved-list').addEventListener('change', (ev) => {
+    const row = state.rows.find((r) => r.id === Number(ev.target.dataset.pick));
+    if (!row) return;
+    row.picked = ev.target.checked;
+    unresolvedSignature = '';
+    updateBulkApply();
+  });
+  $('unresolved-all').addEventListener('click', () => {
+    for (const r of unresolvedRows()) r.picked = true;
+    unresolvedSignature = '';
+    renderUnresolved();
+  });
+  $('unresolved-none').addEventListener('click', () => {
+    for (const r of unresolvedRows()) r.picked = false;
+    unresolvedSignature = '';
+    renderUnresolved();
+  });
+  const bulkInput = $('unresolved-species');
+  bulkInput.addEventListener('input', () => {
+    state.bulkSpecies = Match.find(bulkInput.value) ? bulkInput.value : '';
+    showBulkChoices(bulkInput);
+    updateBulkApply();
+  });
+  bulkInput.addEventListener('focus', () => showBulkChoices(bulkInput));
+  $('unresolved-apply').addEventListener('click', () => {
+    applySpecies(unresolvedRows().filter((r) => r.picked), state.bulkSpecies);
+    bulkInput.value = '';
+    state.bulkSpecies = '';
+    refresh();
+  });
+
   $('files').addEventListener('change', async (ev) => {
     await addFiles(ev.target.files);
     ev.target.value = '';
@@ -359,7 +452,7 @@ function init() {
     if (open) {
       const shown = open.parentElement.querySelector('.combo-list');
       if (shown) closeChoices(); else showCombos(open, rowOf(open));
-    } else if (!ev.target.closest('.choices') && !ev.target.matches('[data-species]')) closeChoices();
+    } else if (!ev.target.closest('.choices') && !ev.target.matches('[data-species], #unresolved-species')) closeChoices();
   });
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeChoices(); });
   rows.addEventListener('click', (ev) => {

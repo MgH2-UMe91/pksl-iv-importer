@@ -44,6 +44,21 @@
   <section id="list-section" hidden>
     <h2>3. 確認・編集する</h2>
     <p class="note">黄色の項目は読み取りの自信が低いので確認してください。色違いは画面の文字に出ないので、手でチェックしてください。ニックネームを付けた個体は種族名が画面に出ないので、アイコンを見て種族を選んでください。</p>
+    <div id="unresolved" class="unresolved" hidden>
+      <h3>種族が決まっていない個体</h3>
+      <p class="note">ニックネームを付けた個体は、種族名が画面に出ません。絵とニックネームを見て、同じ種族の個体にチェックを入れ、種族を選んでまとめて決められます。決めたあとは、1匹ずつ直せます。</p>
+      <ul id="unresolved-list" class="unresolved-list"></ul>
+      <div class="actions">
+        <button id="unresolved-all" type="button">全員を選ぶ</button>
+        <button id="unresolved-none" type="button">選択を外す</button>
+      </div>
+      <p id="unresolved-pick-count" class="note" role="status"></p>
+      <div class="field">
+        <span>種族</span>
+        <input id="unresolved-species" type="text" placeholder="名前で検索" autocomplete="off">
+      </div>
+      <button id="unresolved-apply" class="primary" type="button" disabled>選んだ個体に適用</button>
+    </div>
     <div id="rows"></div>
   </section>
 
