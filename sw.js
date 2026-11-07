@@ -4,7 +4,7 @@
 // - vendor/ は大きくて変わらないので保存優先
 // - 一覧にないファイル(tests/ など)と別サイトへの通信には関わらない
 // ファイルを増やすか vendor/ を入れ替えたら、下の一覧を直して VERSION を上げること
-const VERSION = '9';
+const VERSION = '10';
 const PREFIX = 'iv-importer-';
 const CACHE = PREFIX + VERSION;
 const NET_WAIT_MS = 4000;
