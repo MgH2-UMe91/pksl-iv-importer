@@ -271,3 +271,9 @@ html.standalone .app {
   padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
   background: var(--bg);
 }
+
+/* 制作者と利用条件(画面のいちばん下) */
+.credit { max-width: 860px; margin: 0 auto; padding: 0 16px 28px; color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.credit p { margin: 2px 0; }
+.credit a { color: inherit; text-decoration: underline; }
+@media (max-width: 480px) { .credit { padding: 0 12px 24px; font-size: 0.72rem; } }
