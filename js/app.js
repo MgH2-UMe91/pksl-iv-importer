@@ -317,17 +317,20 @@ function setSpecies(row, name) {
 
 async function addFiles(files) {
   const list = [...files];
+  let failed = 0;
   for (const [i, file] of list.entries()) {
-    $('progress').textContent = `読み取り中 ${i + 1} / ${list.length}`;
+    const first = Reader.isPrepared() ? '' : '(初回は準備に時間がかかります)';
+    $('progress').textContent = `読み取り中 ${i + 1} / ${list.length}${first}`;
     const row = newRow(URL.createObjectURL(file));
     try {
       applyReading(row, await Reader.read(file));
     } catch (e) {
+      failed++;
       row.notes = [`読み取れませんでした: ${e.message}`];
     }
     addRow(row);
   }
-  $('progress').textContent = `${list.length}枚を読み込みました`;
+  $('progress').textContent = failed ? `${list.length}枚のうち${failed}枚を読み取れませんでした` : `${list.length}枚を読み込みました`;
 }
 
 // ---------- 検索付きの選択欄 ----------

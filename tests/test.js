@@ -141,8 +141,40 @@ eq('スキルレベル71は出力を止める', Match.checkRow(row({ skillLevel:
 eq('スキルレベル0は出力を止める', Match.checkRow(row({ skillLevel: 0 })).errors.length, 1);
 eq('スキルレベル8は通る', Match.checkRow(row({ skillLevel: 8 })).errors.length, 0);
 
-const failed = results.filter((r) => !r.ok);
-document.getElementById('out').textContent =
-  `${results.length}件中 ${results.length - failed.length}件成功\n` +
-  failed.map((r) => `NG ${r.name}${r.detail}`).join('\n');
-window.testResult = { total: results.length, failed: failed.map((r) => r.name) };
+// 画面の目印。画像は持たず、色の領域で画面を組み立てる(幅900の画面)
+const GREEN = [30, 220, 90], RED = [255, 120, 85], ORANGE = [255, 190, 60], WHITE = [255, 255, 255];
+const screen = (...rects) => ({
+  W: 900, H: 2000,
+  px: (x, y) => rects.find(([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1)?.[4] ?? WHITE,
+});
+const band = (y, h = 50) => [0, y, 900, y + h, GREEN];
+const nameCard = [0, 120, 30, 270, RED];
+const skillBand = band(735), statusBand = band(1590);
+const frame = [[50, 850, 850, 854, ORANGE], [50, 1040, 850, 1054, ORANGE]];
+const spot = (r) => (r ? { skill: r.skill.a, status: r.status.a, frameBottom: r.frameBottom } : null);
+const expected = { skill: 735, status: 1590, frameBottom: 1053 };
+
+eq('帯が2本の画面', spot(Reader.locate(screen(nameCard, skillBand, statusBand, ...frame))), expected);
+eq('上に「おてつだい能力」の帯が写る画面', spot(Reader.locate(screen(nameCard, band(7), skillBand, statusBand, ...frame))), expected);
+eq('上の帯の下に、中央だけオレンジの絵がある画面', spot(Reader.locate(screen(nameCard, band(7), [420, 300, 480, 360, ORANGE], skillBand, statusBand, ...frame))), expected);
+eq('上の帯が細く切れている画面', spot(Reader.locate(screen(nameCard, band(0, 10), skillBand, statusBand, ...frame))), expected);
+eq('メインスキルの枠がなければ見つからない', Reader.locate(screen(nameCard, band(7), skillBand, statusBand)), null);
+eq('詳細ステータスの帯がなければ見つからない', Reader.locate(screen(nameCard, band(7), skillBand, ...frame)), null);
+
+// 読み取り用データの読み込み。失敗しても止まらない
+const outcome = (p) => p.then((v) => `成功 ${v}`, () => '失敗');
+async function loadTests() {
+  const never = new Promise(() => {});
+  eq('読み込めれば使える', await outcome(Reader.startWorker(async () => 'worker', 'eng', {}, 1000)), '成功 worker');
+  eq('作成の失敗で止まらない', await outcome(Reader.startWorker(() => Promise.reject(new Error('x')), 'eng', {}, 1000)), '失敗');
+  eq('言語データの失敗で止まらない', await outcome(Reader.startWorker((lang, o) => { o.errorHandler('404'); return never; }, 'eng', {}, 1000)), '失敗');
+  eq('返事がなくても時間切れで止まらない', await outcome(Reader.startWorker(() => never, 'eng', {}, 10)), '失敗');
+}
+
+loadTests().finally(() => {
+  const failed = results.filter((r) => !r.ok);
+  document.getElementById('out').textContent =
+    `${results.length}件中 ${results.length - failed.length}件成功\n` +
+    failed.map((r) => `NG ${r.name}${r.detail}`).join('\n');
+  window.testResult = { total: results.length, failed: failed.map((r) => r.name) };
+});

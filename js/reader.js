@@ -41,8 +41,16 @@ const Reader = (() => {
   function locate(P) {
     const { W, H } = P;
     const bands = greenBands(P);
-    if (bands.length < 2) return null;
-    const [skill, status] = bands;
+    // 上に「おてつだい能力」の帯が写ることがある。メインスキルの枠が下に続く帯を探す
+    const frameAt = (y) => [0.25, 0.5, 0.75].every((f) => isFrameOrange(P.px(W * f, y)));
+    const first = bands.findIndex((band, i) => {
+      const next = bands[i + 1];
+      if (!next) return false;
+      for (let y = band.b; y < next.a; y++) if (frameAt(y)) return true;
+      return false;
+    });
+    if (first < 0) return null;
+    const [skill, status] = bands.slice(first);
 
     let card = null;
     for (let y = 0; y < H * 0.3; y++) {
@@ -116,7 +124,20 @@ const Reader = (() => {
   }
 
   // ---------- 文字認識 ----------
+  const LOAD_WAIT_MS = 180000;
+  const LOAD_FAILED = '読み取り用データを読み込めませんでした。通信のよい場所で、もう一度画像を選んでください';
   let workers = null;
+  let prepared = false;
+
+  // Tesseract.js は言語データの読み込みに失敗すると、createWorker の Promise が終わらない。
+  // errorHandler で失敗を受け取り、時間切れも設けて、読み取り中のまま止まらないようにする
+  function startWorker(create, lang, opt, wait = LOAD_WAIT_MS) {
+    return new Promise((ok, ng) => {
+      setTimeout(() => ng(new Error('時間切れ')), wait);
+      create(lang, { ...opt, errorHandler: ng }).then(ok, ng);
+    });
+  }
+
   function loadScript(src) {
     return new Promise((ok, ng) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ng(new Error('読み込み失敗')); document.head.append(s); });
   }
@@ -125,13 +146,20 @@ const Reader = (() => {
       if (!window.Tesseract) await loadScript(new URL('vendor/tesseract.min.js', base).href);
       const at = (p) => new URL(p, base).href;
       const opt = { workerPath: at('vendor/worker.min.js'), corePath: at('vendor/core'), langPath: at('vendor/lang'), workerBlobURL: false };
-      const digits = await Tesseract.createWorker('eng', 1, opt);
-      await digits.setParameters({ tessedit_char_whitelist: 'x0123456789', tessedit_pageseg_mode: '7' });
-      const jpn = await Tesseract.createWorker('jpn', 1, opt);
-      await jpn.setParameters({ tessedit_pageseg_mode: '7' });
-      return { digits, jpn };
-    })();
-    workers.catch(() => { workers = null; });
+      const create = (lang, o) => Tesseract.createWorker(lang, 1, o);
+      const digits = await startWorker(create, 'eng', opt);
+      try {
+        await digits.setParameters({ tessedit_char_whitelist: 'x0123456789', tessedit_pageseg_mode: '7' });
+        const jpn = await startWorker(create, 'jpn', opt);
+        await jpn.setParameters({ tessedit_pageseg_mode: '7' });
+        prepared = true;
+        return { digits, jpn };
+      } catch (e) {
+        digits.terminate();
+        throw e;
+      }
+    })().catch(() => { throw new Error(LOAD_FAILED); });
+    workers.catch(() => { workers = null; }); // 次に画像を選んだときに、もう一度読み込む
     return workers;
   }
   const ocr = async (worker, canvas) => (await worker.recognize(canvas)).data.text.replace(/\s/g, '');
@@ -232,5 +260,5 @@ const Reader = (() => {
     } finally { URL.revokeObjectURL(url); }
   }
 
-  return { read, analyze, locate, getPixels };
+  return { read, analyze, locate, getPixels, startWorker, isPrepared: () => prepared };
 })();
