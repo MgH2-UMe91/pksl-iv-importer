@@ -107,8 +107,36 @@ eq('空の枠は空のまま', Match.applySeed(['', '', '', '', '']), ['', '', '
 eq('位置は変わらない', Match.applySeed(['スキル確率アップS', '', 'おてつだいスピードS', '', C + 'M']), ['スキル確率アップM', '', 'おてつだいスピードM', '', C + 'L']);
 eq('実際の並び', Match.applySeed(['スキル確率アップS', 'おてつだいスピードM', C + 'M', '食材確率アップS', 'おてつだいボーナス']),
   ['スキル確率アップM', 'おてつだいスピードM', C + 'L', '食材確率アップM', 'おてつだいボーナス']);
-eq('銀種を使うと CSV は変化後', Csv.build([row({ seed: true, sub: ['スキル確率アップS', '', '', '', ''] })]).split(/\r?\n/)[1].split(',').slice(8, 13), ['スキル確率アップM', '', '', '', '']);
-eq('銀種を使わなければ CSV はそのまま', Csv.build([row({ seed: false, sub: ['スキル確率アップS', '', '', '', ''] })]).split(/\r?\n/)[1].split(',').slice(8, 13), ['スキル確率アップS', '', '', '', '']);
+const csvSub = (r) => Csv.build([r]).split(/\r?\n/)[1].split(',').slice(8, 13);
+const S5 = ['スキル確率アップS', 'おてつだいスピードS', C + 'S', '', ''];
+const S5on = ['スキル確率アップM', 'おてつだいスピードM', C + 'M', '', ''];
+const mk = () => row({ seed: false, base: null, sub: [...S5] });
+let r1 = mk();
+eq('銀種を使わなければ CSV はそのまま', csvSub(r1), S5);
+Match.setSeed(r1, true);
+eq('銀種を入れると選択欄の値が変化後になる', r1.sub, S5on);
+eq('銀種を入れた CSV は選択欄と同じ(二重に変換しない)', csvSub(r1), S5on);
+Match.setSeed(r1, true);
+eq('もう一度入れても変わらない', r1.sub, S5on);
+Match.setSeed(r1, false);
+eq('銀種を外すと元の値に戻る', r1.sub, S5);
+eq('外したあとの CSV も元の値', csvSub(r1), S5);
+Match.setSeed(r1, false);
+eq('外した状態で外しても変わらない', r1.sub, S5);
+r1 = mk(); Match.setSeed(r1, true); Match.setSeed(r1, false); Match.setSeed(r1, true);
+eq('入れて外してまた入れても、二重に変換しない', r1.sub, S5on);
+r1 = mk(); Match.setSeed(r1, true); Match.editSub(r1, 0, 'スキル確率アップS');
+eq('銀種中に手で選び直すと、その値が表示と CSV になる', csvSub(r1), ['スキル確率アップS', 'おてつだいスピードM', C + 'M', '', '']);
+Match.setSeed(r1, false);
+eq('手で選んだ値は銀種を外しても残り、ほかは元に戻る', r1.sub, S5);
+r1 = mk(); Match.setSeed(r1, true); Match.editSub(r1, 1, '食材確率アップM');
+Match.setSeed(r1, false);
+eq('手で別の値にしたものは、銀種を外してもその値のまま', r1.sub, ['スキル確率アップS', '食材確率アップM', C + 'S', '', '']);
+r1 = mk(); Match.editSub(r1, 0, '食材確率アップS');
+eq('銀種を使わない手の選び直しは元の値になる', r1.sub[0], '食材確率アップS');
+const noChange = row({ seed: false, base: null, sub: ['きのみの数S', 'おてつだいボーナス', '', '', ''] });
+Match.setSeed(noChange, true);
+eq('変化しないサブスキルはそのまま', noChange.sub, ['きのみの数S', 'おてつだいボーナス', '', '', '']);
 
 // 進化の系統
 const inLines = POKEMON.map((p) => p.name).filter((n) => Match.line(n).includes(n));

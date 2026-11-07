@@ -132,8 +132,26 @@ const Match = (() => {
     });
   }
 
-  // CSV に出すサブスキル。銀種を使う個体は変化後
-  const effectiveSub = (row) => (row.seed ? applySeed(row.sub) : row.sub);
+  // 銀種の切り替え。row.sub は画面の選択欄の値で、そのまま CSV に出る。
+  // 使うときは元の値を row.base に控えて row.sub を変化後にし、外すと row.base に戻す(二重には変換しない)
+  function setSeed(row, on) {
+    if (on && !row.seed) {
+      row.base = row.sub.slice();
+      row.sub = applySeed(row.base);
+      row.seed = true;
+    } else if (!on && row.seed) {
+      row.sub = row.base ?? row.sub;
+      row.base = null;
+      row.seed = false;
+    }
+  }
+
+  // サブスキルを手で選び直す。銀種を使っていても、選んだ値をそのまま最終の値とする。
+  // 元の値にも同じ値を入れるので、あとで銀種を外してもその値が残る
+  function editSub(row, i, value) {
+    row.sub[i] = value;
+    if (row.seed && row.base) row.base[i] = value;
+  }
 
   // ---------- 進化の系統 ----------
   // 進化元 → 進化先は data/evolution.js。その種族が属する系統を、進化の浅い順に並べて返す
@@ -225,5 +243,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, applySeed, effectiveSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
+  return { fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();

@@ -11,7 +11,7 @@ function newRow(image = null) {
   return {
     id: state.nextId++, image,
     nickname: '', species: '', level: state.bulkLevel, skillLevel: '', readSkill: '',
-    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, seed: state.bulkSeed, picked: false,
+    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, seed: false, base: null, picked: false,
     low: new Set(), candidates: [], clues: null, icon: '', notes: [],
     shown: '',        // スクショに写っている種族。進化を選んでも変わらない(見本の保存と「進化する」の基準)
     pending: false,   // 「進化する」を入れたが、分岐があって進化先が決まっていない
@@ -142,6 +142,7 @@ function rowHtml(row) {
 
 function addRow(row) {
   if (state.bulkSkill !== null) row.skillLevel = state.bulkSkill;
+  if (state.bulkSeed) Match.setSeed(row, true);
   state.rows.push(row);
   const el = document.createElement('div');
   el.className = 'row';
@@ -226,8 +227,7 @@ function refresh() {
     const { errors, warnings } = Match.checkRow(row);
     const el = $('rows').querySelector(`[data-id="${row.id}"]`);
     for (const f of el.querySelectorAll('[data-key]')) f.classList.toggle('low', row.low.has(f.dataset.key));
-    const after = Match.effectiveSub(row);
-    const changed = row.sub.map((s, k) => (s !== after[k] ? `${s}→${after[k].slice(-1)}` : '')).filter(Boolean);
+    const changed = row.seed ? row.sub.map((s, k) => (s !== row.base[k] ? `${row.base[k]}→${s.slice(-1)}` : '')).filter(Boolean) : [];
     const seedNote = el.querySelector('.seed-note');
     seedNote.hidden = !row.seed;
     seedNote.textContent = changed.length ? `銀種で変わる: ${changed.join('、')}` : '銀種を使っても変わりません。';
@@ -260,8 +260,8 @@ function setLevel(level) {
 function setSeedAll(on) {
   state.bulkSeed = on;
   for (const row of state.rows) {
-    row.seed = on;
-    $('rows').querySelector(`[data-id="${row.id}"] [data-edit="seed"]`).checked = on;
+    Match.setSeed(row, on);
+    $('rows').querySelector(`[data-id="${row.id}"]`).innerHTML = rowHtml(row); // 選択欄を変化後の値にする
   }
   refresh();
 }
@@ -365,9 +365,9 @@ function onEdit(ev) {
   if (key === 'level') row.level = t.value === '' ? NaN : Number(t.value);
   else if (key === 'skillLevel') row.skillLevel = t.value === '' ? '' : Number(t.value);
   else if (key === 'shiny') row.shiny = t.checked;
-  else if (key === 'seed') row.seed = t.checked;
+  else if (key === 'seed') { Match.setSeed(row, t.checked); renderRow(row); return; }
   else if (/^ing\d$/.test(key)) row.ing[key[3]] = t.value;
-  else if (/^sub\d$/.test(key)) row.sub[key[3]] = t.value;
+  else if (/^sub\d$/.test(key)) Match.editSub(row, Number(key[3]), t.value);
   else row[key] = t.value;
   refresh();
 }
