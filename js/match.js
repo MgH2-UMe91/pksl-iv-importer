@@ -63,8 +63,13 @@ const Match = (() => {
   // サブスキルは背景色ごとに候補が決まる。S/Mの読み違いをここで防ぐ
   function subskill(text, color) {
     const m = best(text, SUBSKILL_COLORS[color] ?? SUBSKILLS, loose);
-    if (m) return result(m);
     const any = best(text, SUBSKILLS, loose);
+    if (m) {
+      // 背景色の候補の中で1つに絞れ、色を問わない候補でも同じ値になるなら、文字の余計な誤読は気にしない
+      // (「おてつだいスピードS$S」のように、正しい名前に余計な文字が付くことがある)
+      const sure = SUBSKILL_COLORS[color] && any && any.value === m.value;
+      return { value: m.value, confidence: m.exact || sure ? 'high' : 'low' };
+    }
     return any ? { value: any.value, confidence: 'low' } : result(null);
   }
 

@@ -107,6 +107,15 @@ eq('空の枠は空のまま', Match.applySeed(['', '', '', '', '']), ['', '', '
 eq('位置は変わらない', Match.applySeed(['スキル確率アップS', '', 'おてつだいスピードS', '', C + 'M']), ['スキル確率アップM', '', 'おてつだいスピードM', '', C + 'L']);
 eq('実際の並び', Match.applySeed(['スキル確率アップS', 'おてつだいスピードM', C + 'M', '食材確率アップS', 'おてつだいボーナス']),
   ['スキル確率アップM', 'おてつだいスピードM', C + 'L', '食材確率アップM', 'おてつだいボーナス']);
+eq('金のサブスキルは7つ', [...SUBSKILL_COLORS.gold].sort(), ['きのみの数S', 'ゆめのかけらボーナス', 'げんき回復ボーナス', 'おてつだいボーナス', 'リサーチEXPボーナス', '睡眠EXPボーナス', 'スキルレベルアップM'].sort());
+eq('銀種で金になる(スキルレベルアップS→M)', SUBSKILL_COLORS.gold.includes(Match.applySeed(['スキルレベルアップS', '', '', '', ''])[0]), true);
+eq('サブスキルは完全一致なら自信が高い', Match.subskill('おてつだいスピードS', 'white'), { value: 'おてつだいスピードS', confidence: 'high' });
+eq('余計な文字が付いても、色の中で1つに絞れれば自信は高い', Match.subskill('おてつだいスピードS$S', 'white'), { value: 'おてつだいスピードS', confidence: 'high' });
+eq('金の「ボーナス」の誤読も、色の中で1つに絞れれば自信は高い', Match.subskill('おてつだいボポーナス', 'gold'), { value: 'おてつだいボーナス', confidence: 'high' });
+eq('色が決まらないときは誤読に印を付ける', Match.subskill('おてつだいボポーナス', undefined).confidence, 'low');
+eq('色の中の候補と色を問わない候補が食い違うときは印を付ける(色の誤検出に備える)', Match.subskill('スキルレベルアップS', 'white').confidence, 'low');
+eq('色の中の近い候補は、取り違えやすい S と M でも色で決まる', Match.subskill('おてつだいスピードM', 'white').value, 'おてつだいスピードS');
+eq('読めなければ空', Match.subskill('', 'white').value, '');
 const csvSub = (r) => Csv.build([r]).split(/\r?\n/)[1].split(',').slice(8, 13);
 const S5 = ['スキル確率アップS', 'おてつだいスピードS', C + 'S', '', ''];
 const S5on = ['スキル確率アップM', 'おてつだいスピードM', C + 'M', '', ''];

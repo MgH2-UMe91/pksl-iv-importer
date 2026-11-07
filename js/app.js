@@ -226,7 +226,11 @@ function refresh() {
   state.rows.forEach((row, i) => {
     const { errors, warnings } = Match.checkRow(row);
     const el = $('rows').querySelector(`[data-id="${row.id}"]`);
-    for (const f of el.querySelectorAll('[data-key]')) f.classList.toggle('low', row.low.has(f.dataset.key));
+    for (const f of el.querySelectorAll('[data-key]')) {
+      f.classList.toggle('low', row.low.has(f.dataset.key));
+      const sub = /^sub(\d)$/.exec(f.dataset.key); // 金のサブスキルは選択欄の値に合わせて金色にする
+      if (sub) f.classList.toggle('gold', SUBSKILL_COLORS.gold.includes(row.sub[sub[1]]));
+    }
     const changed = row.seed ? row.sub.map((s, k) => (s !== row.base[k] ? `${row.base[k]}→${s.slice(-1)}` : '')).filter(Boolean) : [];
     const seedNote = el.querySelector('.seed-note');
     seedNote.hidden = !row.seed;

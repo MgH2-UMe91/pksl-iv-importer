@@ -7,8 +7,9 @@
   --line: #d3dae3;
   --accent: #2f6fde;
   --accent-text: #ffffff;
-  --low: #fff3c4;
-  --low-line: #d9a400;
+  --gold: #ffe9a0;
+  --gold-line: #c99a00;
+  --low-line: #e65100;
   --error: #c62828;
 }
 
@@ -21,8 +22,9 @@
     --line: #36404d;
     --accent: #6c9eff;
     --accent-text: #0d1420;
-    --low: #4a3c0a;
-    --low-line: #c9a227;
+    --gold: #4a3c0a;
+    --gold-line: #c9a227;
+    --low-line: #ff9e40;
     --error: #ff8a80;
   }
 }
@@ -42,7 +44,7 @@ h1 { font-size: 1.4rem; margin: 8px 0; }
 h2 { font-size: 1.1rem; margin: 0 0 8px; }
 h3 { font-size: 1rem; margin: 16px 0 8px; }
 header p { margin: 0; color: var(--muted); }
-header .notice { margin-top: 8px; padding-left: 8px; border-left: 3px solid var(--low-line); color: var(--text); font-size: 0.8rem; line-height: 1.5; }
+header .notice { margin-top: 8px; padding-left: 8px; border-left: 3px solid var(--gold-line); color: var(--text); font-size: 0.8rem; line-height: 1.5; }
 header .notice a { color: inherit; text-decoration: underline; }
 
 section {
@@ -116,7 +118,9 @@ textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; m
 .field { position: relative; min-width: 0; }
 .field.wide { grid-column: 1 / -1; }
 .field > span { display: block; font-size: 0.8rem; color: var(--muted); }
-.field.low input, .field.low select { background: var(--low); border-color: var(--low-line); }
+.field.low input, .field.low select { border: 2px solid var(--low-line); }
+.field.gold select { background: var(--gold); border-color: var(--gold-line); }
+.field.gold.low select { border: 2px solid var(--low-line); }
 .field.missing input { border-color: var(--error); }
 .check { display: flex; align-items: center; gap: 6px; min-height: 40px; }
 
@@ -153,7 +157,7 @@ textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; m
 .combo-list li { border-top: 1px dashed var(--line); }
 .combo-list li:first-child { border-top: 0; }
 .combo-list li[aria-selected="true"] { background: var(--bg); }
-.field.low .combo { background: var(--low); border-color: var(--low-line); }
+.field.low .combo { border: 2px solid var(--low-line); }
 .slot { min-width: 0; }
 .pic { display: flex; align-items: center; justify-content: center; gap: 2px; min-height: 34px; }
 .ico { display: inline-block; width: 34px; height: 34px; padding: 4px; border-radius: 50%; background: #fff6d8; }
