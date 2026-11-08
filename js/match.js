@@ -110,6 +110,7 @@ const Match = (() => {
 
     // 3番目の枠
     opts = byAmount([{ g: a, n: a60 }, { g: b, n: b60 }, ...(c ? [{ g: c, n: c60 }] : [])], clues.amount[1]);
+    const withA = opts.some((o) => o.g === a);
     if (opts.length > 1) {
       const sameSecond = clues.s32 >= SAME;
       const same = opts.filter((o) => (o.g === second ? sameSecond : o.g === a ? clues.s31 >= SAME : false));
@@ -118,6 +119,8 @@ const Match = (() => {
       else if (rest.length >= 1 && !sameSecond) opts = rest;
     }
     if (opts.length > 1) low.push(2);
+    // 1つ目と同じ絵に見えるのに、1つ目と違う食材になったときは、絵の比較が食い違っているので確認を促す
+    else if (withA && opts[0].g !== a && clues.s31 >= SAME) low.push(2);
     return { ing: [a, second, opts[0].g], low };
   }
 

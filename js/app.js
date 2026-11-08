@@ -26,6 +26,7 @@ function applyReading(row, read) {
   row.nickname = sp.nickname;
   row.candidates = sp.candidates;
   if (sp.confidence === 'low') row.low.add('species');
+  if (!sp.species && !sp.nickname) row.low.add('nickname'); // 名前を読めなかった。どの個体か見分けられるよう確認を促す
 
   const take = (key, m) => { if (m.confidence === 'low') row.low.add(key); return m.value; };
   row.nature = take('nature', Match.nature(read.nature));
@@ -123,7 +124,7 @@ function rowHtml(row) {
           <input type="text" data-species value="${esc(row.species)}" placeholder="名前で検索" autocomplete="off">
         </div>
         ${evolutionField(row)}
-        <label class="field"><span>ニックネーム</span><input type="text" data-edit="nickname" value="${esc(row.nickname)}"></label>
+        <label class="field" data-key="nickname"><span>ニックネーム</span><input type="text" data-edit="nickname" value="${esc(row.nickname)}"></label>
       </div>
     </div>
     <div class="fields">

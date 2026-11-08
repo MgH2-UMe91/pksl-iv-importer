@@ -106,21 +106,30 @@ const Reader = (() => {
     return 'white';
   }
 
-  // 食材枠の絵の比較。背景からの差の向きを比べるので、解放前の薄い絵と通常の絵でも比べられる
+  // 食材枠の絵の比較。背景からの差の向きを比べるので、解放前の薄い絵と通常の絵でも比べられる。
+  // 枠の位置は画面によって1〜2画素ずれ、瓶のように輪郭のはっきりした絵はそれだけで値が下がる。
+  // 2つ目の絵を上下左右に少しずらして比べ、いちばん合う位置の値を使う
   function similarity(P, cx1, cx2, y0, y1) {
     const W = P.W, bgOf = (cx) => P.px(cx - W * 0.062, y0 + (y1 - y0) / 2);
     const b1 = bgOf(cx1), b2 = bgOf(cx2);
-    let dot = 0, n1 = 0, n2 = 0;
-    for (let y = y0; y < y1; y += 2) {
-      for (let dx = -W * 0.05; dx < W * 0.03; dx += 2) {
-        const p = P.px(cx1 + dx, y), q = P.px(cx2 + dx, y);
-        for (let k = 0; k < 3; k++) {
-          const u = p[k] - b1[k], v = q[k] - b2[k];
-          dot += u * v; n1 += u * u; n2 += v * v;
+    const reach = Math.max(1, Math.round(W * 0.002));
+    let best = null;
+    for (let sy = -reach; sy <= reach; sy++) {
+      for (let sx = -reach; sx <= reach; sx++) {
+        let dot = 0, n1 = 0, n2 = 0;
+        for (let y = y0; y < y1; y += 2) {
+          for (let dx = -W * 0.05; dx < W * 0.03; dx += 2) {
+            const p = P.px(cx1 + dx, y), q = P.px(cx2 + dx + sx, y + sy);
+            for (let k = 0; k < 3; k++) {
+              const u = p[k] - b1[k], v = q[k] - b2[k];
+              dot += u * v; n1 += u * u; n2 += v * v;
+            }
+          }
         }
+        if (n1 && n2) best = Math.max(best ?? -1, dot / Math.sqrt(n1 * n2));
       }
     }
-    return n1 && n2 ? dot / Math.sqrt(n1 * n2) : null;
+    return best;
   }
 
   // ---------- 文字認識 ----------
