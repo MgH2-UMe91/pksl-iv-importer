@@ -193,6 +193,15 @@ const Match = (() => {
     return n >= 1 && n <= 8 ? n : null;
   }
 
+  // ゲームのポケモンの最大レベル(2026年6月の Ver.3.6.0 で 70)。読み取りではこれを超える値を認めない
+  const GAME_MAX_LEVEL = 70;
+  // 読み取った文字からポケモンのレベルを取り出す。数字だけの1〜2桁で、1〜GAME_MAX_LEVEL だけを認める
+  function levelFrom(text) {
+    const m = String(text ?? '').match(/^x?(\d{1,2})$/);
+    const n = m ? Number(m[1]) : null;
+    return n >= 1 && n <= GAME_MAX_LEVEL ? n : null;
+  }
+
   const speciesNames = POKEMON.map((p) => p.name);
   const baseName = (name) => name.replace(/\(.*$/, '');
 
@@ -248,5 +257,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
+  return { fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();

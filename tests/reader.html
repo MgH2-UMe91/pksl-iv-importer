@@ -31,6 +31,7 @@
     check('ニックネーム', sp.nickname, t.nickname);
     check('性格', Match.nature(r.nature).value, t.nature);
     check('スキルレベル', r.skillLevel, t.skillLevel);
+    if (t.level) check('レベル', r.level, t.level);
     r.sub.forEach((x, i) => check('サブスキル', Match.subskill(x, r.subColor[i]).value, t.sub[i]));
     if (t.unknown) { notes.push(`${name} 種族が未確認のため、種族と食材は数えない`); continue; }
     const g = Match.ingredients(Match.find(t.species || t.pick)?.name, r.clues);

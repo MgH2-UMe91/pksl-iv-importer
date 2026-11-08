@@ -5,12 +5,12 @@ const LEVELS = [30, 50, 60, 70, 80];
 const SKILL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8];
 const $ = (id) => document.getElementById(id);
 
-const state = { rows: [], bulkLevel: 60, bulkSkill: null, bulkSeed: false, bulkSpecies: '', nextId: 1 }; // bulkSkill が null なら読み取った値を使う
+const state = { rows: [], bulkLevel: null, bulkSkill: null, bulkSeed: false, bulkSpecies: '', nextId: 1 }; // bulkLevel と bulkSkill が null なら読み取った値を使う
 
 function newRow(image = null) {
   return {
     id: state.nextId++, image,
-    nickname: '', species: '', level: state.bulkLevel, skillLevel: '', readSkill: '',
+    nickname: '', species: '', level: NaN, readLevel: null, manualLevel: null, skillLevel: '', readSkill: '',
     ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, seed: false, base: null, picked: false,
     low: new Set(), candidates: [], clues: null, icon: '', notes: [],
     shown: '',        // スクショに写っている種族。進化を選んでも変わらない(見本の保存と「進化する」の基準)
@@ -30,6 +30,8 @@ function applyReading(row, read) {
   const take = (key, m) => { if (m.confidence === 'low') row.low.add(key); return m.value; };
   row.nature = take('nature', Match.nature(read.nature));
   row.sub = read.sub.map((t, i) => take(`sub${i}`, Match.subskill(t, read.subColor[i])));
+  row.readLevel = read.level ?? null;
+  if (read.level === null) row.low.add('level'); // 読めない、または範囲外のときは空欄にして印を付ける
   row.skillLevel = row.readSkill = read.skillLevel ?? '';
   if (read.skillLevel === null) row.low.add('skillLevel'); // 読めないときは黄色にして確認を促す
   row.clues = read.clues;
@@ -125,7 +127,7 @@ function rowHtml(row) {
       </div>
     </div>
     <div class="fields">
-      <label class="field"><span>レベル</span><input type="number" data-edit="level" min="1" max="100" value="${Number.isNaN(row.level) ? '' : row.level}"></label>
+      <label class="field" data-key="level"><span>レベル</span><input type="number" data-edit="level" min="1" max="100" value="${Number.isNaN(row.level) ? '' : row.level}"></label>
       <label class="field" data-key="skillLevel"><span>スキルレベル</span><input type="number" data-edit="skillLevel" min="1" max="8" value="${row.skillLevel}"></label>
       ${selectField('性格', 'nature', row.nature, NATURES)}
       <label class="check"><input type="checkbox" data-edit="shiny"${row.shiny ? ' checked' : ''}>色違い</label>
@@ -141,6 +143,7 @@ function rowHtml(row) {
 }
 
 function addRow(row) {
+  row.level = levelOf(row);
   if (state.bulkSkill !== null) row.skillLevel = state.bulkSkill;
   if (state.bulkSeed) Match.setSeed(row, true);
   state.rows.push(row);
@@ -227,7 +230,8 @@ function refresh() {
     const { errors, warnings } = Match.checkRow(row);
     const el = $('rows').querySelector(`[data-id="${row.id}"]`);
     for (const f of el.querySelectorAll('[data-key]')) {
-      f.classList.toggle('low', row.low.has(f.dataset.key));
+      // レベルの印は「読取」のときだけ。一括の値を選んだら、その値が入っている
+      f.classList.toggle('low', row.low.has(f.dataset.key) && !(f.dataset.key === 'level' && state.bulkLevel !== null));
       const sub = /^sub(\d)$/.exec(f.dataset.key); // 金のサブスキルは選択欄の値に合わせて金色にする
       if (sub) f.classList.toggle('gold', SUBSKILL_COLORS.gold.includes(row.sub[sub[1]]));
     }
@@ -253,11 +257,16 @@ function refresh() {
   $('preview').value = ok ? Csv.build(state.rows) : '';
 }
 
+// 行に入れるレベル。一括の値を選んでいればそれ、「読取」なら手で直した値、なければ読み取った値。どれもなければ空欄
+const levelOf = (row) => state.bulkLevel ?? row.manualLevel ?? row.readLevel ?? NaN;
+
 function setLevel(level) {
   state.bulkLevel = level;
-  for (const row of state.rows) row.level = level;
-  for (const b of $('levels').children) b.classList.toggle('selected', Number(b.textContent) === level);
-  for (const input of document.querySelectorAll('[data-edit="level"]')) input.value = level;
+  for (const row of state.rows) {
+    row.level = levelOf(row);
+    $('rows').querySelector(`[data-id="${row.id}"] [data-edit="level"]`).value = Number.isNaN(row.level) ? '' : row.level;
+  }
+  for (const b of $('levels').children) b.classList.toggle('selected', b.dataset.level === String(level));
   refresh();
 }
 
@@ -366,7 +375,10 @@ function onEdit(ev) {
   if (!key) return;
   const row = rowOf(t);
   row.low.delete(key);
-  if (key === 'level') row.level = t.value === '' ? NaN : Number(t.value);
+  if (key === 'level') {
+    row.level = t.value === '' ? NaN : Number(t.value);
+    row.manualLevel = t.value === '' ? null : row.level; // 一括の切り替えで「読取」に戻したときに使う
+  }
   else if (key === 'skillLevel') row.skillLevel = t.value === '' ? '' : Number(t.value);
   else if (key === 'shiny') row.shiny = t.checked;
   else if (key === 'seed') { Match.setSeed(row, t.checked); renderRow(row); return; }
@@ -385,10 +397,12 @@ function detectStandalone() {
 
 function init() {
   detectStandalone();
-  for (const level of LEVELS) {
+  for (const level of [null, ...LEVELS]) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = String(level);
+    b.textContent = level === null ? '読取' : String(level);
+    b.dataset.level = String(level);
+    if (level === null) b.setAttribute('aria-label', '読み取った値');
     b.classList.toggle('selected', level === state.bulkLevel);
     b.addEventListener('click', () => setLevel(level));
     $('levels').append(b);

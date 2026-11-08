@@ -178,6 +178,23 @@ eq('スキルレベル71は出力を止める', Match.checkRow(row({ skillLevel:
 eq('スキルレベル0は出力を止める', Match.checkRow(row({ skillLevel: 0 })).errors.length, 1);
 eq('スキルレベル8は通る', Match.checkRow(row({ skillLevel: 8 })).errors.length, 0);
 
+// ポケモンのレベルの読み取り
+eq('ゲームの最大レベルは70', Match.GAME_MAX_LEVEL, 70);
+eq('レベル2桁', Match.levelFrom('23'), 23);
+eq('レベル1桁', Match.levelFrom('7'), 7);
+eq('最大レベルは通る', Match.levelFrom('70'), 70);
+eq('最大レベルを超える値は認めない(「Lv.1」を「71」と読む誤読も止まる)', Match.levelFrom('71'), null);
+eq('3桁は認めない', Match.levelFrom('123'), null);
+eq('0は認めない', Match.levelFrom('0'), null);
+eq('読めなければ null', Match.levelFrom(''), null);
+eq('数字以外が混じれば null', Match.levelFrom('2x3'), null);
+const cols = (s) => [...s].map((c) => c === '#');
+eq('「Lv. 23」の数字の範囲は、いちばん広いすき間より右', Reader.levelDigitSpan(cols('##.###.#....##.##')), [12, 16, 2]);
+eq('「Lv. 1」の細い数字も拾う', Reader.levelDigitSpan(cols('##.###.#.....#')), [13, 13, 1]);
+eq('接した数字は1かたまり(桁数の下限は1)', Reader.levelDigitSpan(cols('##.###.#....#####')), [12, 16, 1]);
+eq('緑の文字が1かたまりなら読まない', Reader.levelDigitSpan(cols('..####..')), null);
+eq('緑の文字がなければ読まない', Reader.levelDigitSpan(cols('......')), null);
+
 // 画面の目印。画像は持たず、色の領域で画面を組み立てる(幅900の画面)
 const GREEN = [30, 220, 90], RED = [255, 120, 85], ORANGE = [255, 190, 60], WHITE = [255, 255, 255];
 const screen = (...rects) => ({

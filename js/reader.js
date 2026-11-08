@@ -188,6 +188,35 @@ const Reader = (() => {
     return ranked.length && ranked[0][1] >= 2 && (ranked.length === 1 || ranked[0][1] > ranked[1][1]) ? ranked[0][0] : null;
   }
 
+  // 「Lv. 23」の緑の文字の列(true/false の並び)から、数字の範囲と桁数 [始め, 終わり, 桁数] を返す。
+  // 「.」と数字の間がいちばん広いすき間なので、それより右を数字とする。「v」を数字に含めない(「71」の誤読を防ぐ)。
+  // 数字は離れていることが多いので、かたまりの数を桁数の下限に使う
+  function levelDigitSpan(cols) {
+    const runs = [];
+    cols.forEach((on, i) => {
+      if (!on) return;
+      const last = runs[runs.length - 1];
+      if (last && i - last[1] <= 1) last[1] = i; else runs.push([i, i]);
+    });
+    if (runs.length < 2) return null;
+    let k = 1;
+    for (let i = 2; i < runs.length; i++) if (runs[i][0] - runs[i - 1][1] > runs[k][0] - runs[k - 1][1]) k = i;
+    return [runs[k][0], runs[runs.length - 1][1], runs.length - k];
+  }
+
+  // 数字の範囲を余白と大きさを変えて5回読み、2回以上そろって他より多い値にする。
+  // 細い「1」を落として「19」を「9」と読むことがあるので、かたまりの数より桁の少ない読みは数えない
+  // (数字どうしが接して1かたまりになることはあるので、かたまりの数は桁数の下限として使う)
+  async function readLevel(P, digits, x0, x1, y0, y1, count) {
+    const W = P.W, votes = new Map();
+    for (const [pad, h] of [[0.006, 60], [0.01, 96], [0.004, 44], [0.014, 60], [0.008, 72]]) {
+      const n = Match.levelFrom(await ocr(digits, cropText(P, x0 - W * pad, y0, x1 + W * pad, y1, h)));
+      if (n !== null && String(n).length >= count) votes.set(n, (votes.get(n) ?? 0) + 1);
+    }
+    const ranked = [...votes].sort((p, q) => q[1] - p[1]);
+    return ranked.length && ranked[0][1] >= 2 && (ranked.length === 1 || ranked[0][1] > ranked[1][1]) ? ranked[0][0] : null;
+  }
+
   function iconOf(P, card) {
     const { W } = P, h = card.b - card.a;
     const c = document.createElement('canvas');
@@ -212,6 +241,17 @@ const Reader = (() => {
       for (let y = ny0; y < ny1; y += 2) if (isTextGreen(P.px(x, y))) { nx = x; break; }
     }
     res.name = await ocr(jpn, cropText(P, nx + W * 0.008, ny0, W * 0.56, ny1));
+
+    // ポケモンのレベル: 名札の緑の「Lv. 23」の数字だけを読む
+    const x0 = Math.round(W * 0.2), cols = [];
+    for (let x = x0; x <= nx; x++) {
+      let on = false;
+      for (let y = ny0; y < ny1 && !on; y++) on = isTextGreen(P.px(x, y));
+      cols.push(on);
+    }
+    const span = levelDigitSpan(cols);
+    res.level = span ? await readLevel(P, digits, x0 + span[0], x0 + span[1], ny0, ny1, span[2]) : null;
+    if (res.level === null) res.warnings.push('レベルを読めませんでした(入れてください)');
 
     // メインスキルのレベル: 枠の右上の「Lv.1」の数字だけを読む。見出しの下端からの距離は一定
     res.skillLevel = await readSkillLevel(P, digits, W * 0.893, skill.b + W * 0.1277);
@@ -260,5 +300,5 @@ const Reader = (() => {
     } finally { URL.revokeObjectURL(url); }
   }
 
-  return { read, analyze, locate, getPixels, startWorker, isPrepared: () => prepared };
+  return { read, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
 })();
