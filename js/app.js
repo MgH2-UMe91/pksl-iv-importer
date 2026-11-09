@@ -234,7 +234,7 @@ function refresh() {
       // レベルの印は「読取」のときだけ。一括の値を選んだら、その値が入っている
       f.classList.toggle('low', row.low.has(f.dataset.key) && !(f.dataset.key === 'level' && state.bulkLevel !== null));
       const sub = /^sub(\d)$/.exec(f.dataset.key); // 金のサブスキルは選択欄の値に合わせて金色にする
-      if (sub) f.classList.toggle('gold', SUBSKILL_COLORS.gold.includes(row.sub[sub[1]]));
+      if (sub) for (const c of ['blue', 'gold']) f.classList.toggle(c, SUBSKILL_COLORS[c].includes(row.sub[sub[1]]));
     }
     const changed = row.seed ? row.sub.map((s, k) => (s !== row.base[k] ? `${row.base[k]}→${s.slice(-1)}` : '')).filter(Boolean) : [];
     const seedNote = el.querySelector('.seed-note');

@@ -113,6 +113,9 @@ eq('位置は変わらない', Match.applySeed(['スキル確率アップS', '',
 eq('実際の並び', Match.applySeed(['スキル確率アップS', 'おてつだいスピードM', C + 'M', '食材確率アップS', 'おてつだいボーナス']),
   ['スキル確率アップM', 'おてつだいスピードM', C + 'L', '食材確率アップM', 'おてつだいボーナス']);
 eq('金のサブスキルは7つ', [...SUBSKILL_COLORS.gold].sort(), ['きのみの数S', 'ゆめのかけらボーナス', 'げんき回復ボーナス', 'おてつだいボーナス', 'リサーチEXPボーナス', '睡眠EXPボーナス', 'スキルレベルアップM'].sort());
+eq('青のサブスキルは6つ', [...SUBSKILL_COLORS.blue].sort(), ['スキルレベルアップS', 'スキル確率アップM', 'おてつだいスピードM', '食材確率アップM', '最大所持数アップM', '最大所持数アップL'].sort());
+eq('銀種で青になる(最大所持数アップS→M)', SUBSKILL_COLORS.blue.includes(Match.applySeed(['最大所持数アップS', '', '', '', ''])[0]), true);
+eq('青と金は重ならない', SUBSKILL_COLORS.blue.filter((x) => SUBSKILL_COLORS.gold.includes(x)), []);
 eq('銀種で金になる(スキルレベルアップS→M)', SUBSKILL_COLORS.gold.includes(Match.applySeed(['スキルレベルアップS', '', '', '', ''])[0]), true);
 eq('サブスキルは完全一致なら自信が高い', Match.subskill('おてつだいスピードS', 'white'), { value: 'おてつだいスピードS', confidence: 'high' });
 eq('余計な文字が付いても、色の中で1つに絞れれば自信は高い', Match.subskill('おてつだいスピードS$S', 'white'), { value: 'おてつだいスピードS', confidence: 'high' });

@@ -9,6 +9,8 @@
   --accent-text: #ffffff;
   --gold: #ffe9a0;
   --gold-line: #c99a00;
+  --blue: #cfe2ff;
+  --blue-line: #2f6fde;
   --low-line: #e65100;
   --error: #c62828;
 }
@@ -24,6 +26,8 @@
     --accent-text: #0d1420;
     --gold: #4a3c0a;
     --gold-line: #c9a227;
+    --blue: #17315c;
+    --blue-line: #6c9eff;
     --low-line: #ff9e40;
     --error: #ff8a80;
   }
@@ -120,7 +124,8 @@ textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; m
 .field > span { display: block; font-size: 0.8rem; color: var(--muted); }
 .field.low input, .field.low select { border: 2px solid var(--low-line); }
 .field.gold select { background: var(--gold); border-color: var(--gold-line); }
-.field.gold.low select { border: 2px solid var(--low-line); }
+.field.blue select { background: var(--blue); border-color: var(--blue-line); }
+.field.gold.low select, .field.blue.low select { border: 2px solid var(--low-line); }
 .field.missing input { border-color: var(--error); }
 .check { display: flex; align-items: center; gap: 6px; min-height: 40px; }
 
