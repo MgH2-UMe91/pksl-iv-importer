@@ -144,6 +144,7 @@ function rowHtml(row) {
 }
 
 function addRow(row) {
+  Install.dismiss();
   row.level = levelOf(row);
   if (state.bulkSkill !== null) row.skillLevel = state.bulkSkill;
   if (state.bulkSeed) Match.setSeed(row, true);
@@ -331,6 +332,7 @@ function setSpecies(row, name) {
 
 async function addFiles(files) {
   const list = [...files];
+  Install.dismiss();
   let failed = 0;
   for (const [i, file] of list.entries()) {
     const first = Reader.isPrepared() ? '' : '(初回は準備に時間がかかります)';
@@ -524,6 +526,7 @@ function init() {
 }
 
 init();
+Install.init(() => state.rows.length > 0 || !!$('progress').textContent.startsWith('読み取り中'));
 
 // オフライン対応。使えない環境でもそのまま動く
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
