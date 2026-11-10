@@ -45,7 +45,7 @@ const Install = (() => {
     const steps = kind === 'ios'
       ? '<ol><li>画面の下(または上)の共有ボタン <span class="ip-ic" aria-hidden="true">⎙</span>(□に↑)をタップ</li><li>メニューを少し上へ送り、「ホーム画面に追加」をタップ</li><li>右上の「追加」をタップ</li></ol><p class="ip-small">Safari で開いているときの手順です。他のブラウザなら、Safari で開き直してください。</p>'
       : '<div class="ip-android"></div>';
-    pop.innerHTML = `<p class="ip-title">ホーム画面に追加すると、アプリのようにすぐ開けます</p>${steps}<div class="ip-btns"><button type="button" id="ipLater">あとで</button><button type="button" id="ipNever">もう表示しない</button></div>`;
+    pop.innerHTML = `<p class="ip-title">ホーム画面に追加できます</p>${steps}<div class="ip-btns"><button type="button" id="ipLater">あとで</button><button type="button" id="ipNever">もう表示しない</button></div>`;
     document.body.append(pop);
     const later = () => { save({ laterAt: Date.now() }); close(); };
     pop.querySelector('#ipLater').onclick = later;
