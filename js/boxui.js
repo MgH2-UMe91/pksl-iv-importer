@@ -267,7 +267,6 @@ const BoxUi = (() => {
     closeAsk();
     g('box-import-title').textContent = `${nameOf(active)}にインポート`;
     g('box-import-text').value = '';
-    g('box-import-method').value = 'paste';
     clearImportMessages();
     g('box-import-done').textContent = '';
     document.documentElement.classList.add('modal-open'); // 後ろの画面がスクロールしないようにする
@@ -386,12 +385,8 @@ const BoxUi = (() => {
     dlg().addEventListener('click', (ev) => { if (ev.target === dlg()) closeImport(); });
     dlg().addEventListener('close', afterImportClosed);
     dlg().addEventListener('cancel', afterImportClosed); // Esc は cancel のあとに close になる。どちらでも片付ける
-    // 「ファイル」を選ぶとファイル選択を開き、選んだ内容を貼り付け欄に入れる(そのまま入れずに、確かめてから「インポート」)
-    g('box-import-method').addEventListener('change', (ev) => {
-      if (ev.target.value !== 'file') return;
-      ev.target.value = 'paste';
-      g('box-import-file').click();
-    });
+    // 「ファイルを選ぶ」は <label> が <input type=file> を包む形(タップがそのまま input に届く。iOS は選択欄などから click() で開くと断ることがある)
+    // accept は付けない(iOS のファイルアプリで .csv・.tsv がグレーになることがあるため)。選んだ内容は貼り付け欄に入れ、中身で判定する
     g('box-import-file').addEventListener('change', async (ev) => {
       const file = ev.target.files[0];
       ev.target.value = '';

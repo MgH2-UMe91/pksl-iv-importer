@@ -131,13 +131,7 @@
   <div class="modal-body">
     <h3 id="box-import-title">インポート</h3>
     <p class="note">このアプリや個体値計算機からエクスポートしたCSV・TSVを貼り付けて、「インポート」を押してください。1行目の列名は必須です。</p>
-    <label class="field"><span>インポート方法</span>
-      <select id="box-import-method" aria-label="インポート方法">
-        <option value="paste">貼り付け</option>
-        <option value="file">ファイル</option>
-      </select>
-    </label>
-    <input id="box-import-file" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden>
+    <div class="actions"><label class="button" id="box-import-pick">ファイルを選ぶ<input id="box-import-file" type="file" hidden></label></div>
     <textarea id="box-import-text" rows="9" placeholder="ここに長押しで貼り付けてください(1行目が列名のCSV)" autocomplete="off" aria-label="貼り付け欄"></textarea>
     <p id="box-import-warn" class="box-warn" role="status"></p>
     <p id="box-import-result" class="note" role="status"></p>
