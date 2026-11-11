@@ -72,7 +72,31 @@ const Box = (() => {
     return keys;
   };
 
+  const PAGE_SIZE = 30;
+  // 5 のリストに出す個体を決める。opts: { query, ingredient, onlyFlag, sort, page(0始まり) }
+  // 返す値: { items: [{ a, i, flag }](このページ), count(絞り込み後の匹数), pages, page, flagged(BOX全体の要確認の数) }
+  function view(rows, opts = {}) {
+    const q = Match.fold(String(opts.query ?? '').trim());
+    const all = rows.map((a, i) => ({ a, i, flag: needsCheck(a) }));
+    const flagged = all.filter((x) => x.flag).length;
+    const items = all.filter((x) => (!q || Match.fold(`${x.a[1]} ${x.a[0]}`).includes(q))
+      && (!opts.ingredient || x.a[4].includes(opts.ingredient))
+      && (!opts.onlyFlag || x.flag));
+    if (opts.sort === 'newest') items.reverse();
+    else if (opts.sort === 'species') items.sort((x, y) => String(x.a[1]).localeCompare(String(y.a[1]), 'ja') || x.i - y.i);
+    else if (opts.sort === 'level') items.sort((x, y) => (y.a[2] ?? 0) - (x.a[2] ?? 0) || x.i - y.i);
+    const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    const page = Math.min(Math.max(0, opts.page ?? 0), pages - 1);
+    return { items: items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), count: items.length, pages, page, flagged };
+  }
+
+  // クリップボードから読み込むとき、読めなかった・空だったときの案内。読めたなら ''
+  // text が null なら読めなかった(許可されない・使えないブラウザ)
+  const clipboardNotice = (text) => (text === null
+    ? 'クリップボードを読めませんでした。下の欄に長押しで貼り付けてください。'
+    : !String(text).trim() ? 'クリップボードが空でした。CSVをコピーしてからもう一度押すか、下の欄に長押しで貼り付けてください。' : '');
+
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, PAGE_SIZE, clipboardNotice, csv };
 })();

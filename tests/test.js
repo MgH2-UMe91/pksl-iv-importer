@@ -219,6 +219,41 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('ちょうど300匹になる読み込みは入る', Box.plan(50, [250, 0])[0].fits, true);
 }
 
+// BOX のリスト(ページ分け・絞り込み)
+{
+  const mkRow = (i, o = {}) => Box.pack(row({ nickname: `n${i}`, level: 20 + (i % 50), ...o }));
+  const rows = Array.from({ length: 70 }, (_, i) => mkRow(i));
+  const v0 = Box.view(rows, {});
+  eq('1ページ30匹(70匹なら3ページ)', [v0.items.length, v0.pages, v0.page, v0.count], [30, 3, 0, 70]);
+  eq('最後のページは残りの10匹', Box.view(rows, { page: 2 }).items.length, 10);
+  eq('ページ送りで続きが出る(31番目から)', Box.view(rows, { page: 1 }).items[0].i, 30);
+  eq('範囲外のページは最後のページにそろえる', Box.view(rows, { page: 99 }).page, 2);
+  eq('負のページは1ページ目', Box.view(rows, { page: -3 }).page, 0);
+  eq('空のBOXは1ページ', [Box.view([], {}).pages, Box.view([], {}).items.length], [1, 0]);
+  eq('30匹ちょうどは1ページ', Box.view(rows.slice(0, 30), {}).pages, 1);
+  eq('31匹は2ページ', Box.view(rows.slice(0, 31), {}).pages, 2);
+  eq('新しい順は後ろから', Box.view(rows, { sort: 'newest' }).items[0].i, 69);
+  eq('レベルの高い順', Box.view(rows, { sort: 'level' }).items[0].a[2], 69);
+  eq('名前の絞り込み(ニックネーム)', Box.view(rows, { query: 'n7' }).items.map((x) => x.i), [7]);
+  eq('絞り込み後の件数とページ数', (() => { const v = Box.view(rows, { query: 'n1' }); return [v.count, v.pages]; })(), [11, 1]);
+
+  const ing = rows.map((r, i) => (i % 5 === 0 ? Box.pack(row({ nickname: `n${i}`, ing: ['あまいミツ', 'あんみんトマト', 'ほっこりポテト'] })) : Box.pack(row({ nickname: `n${i}`, ing: ['あまいミツ', 'あんみんトマト', ''] }))));
+  eq('食材で絞り込む(その食材を持つ個体だけ)', Box.view(ing, { ingredient: 'ほっこりポテト' }).count, 14);
+  eq('食材の絞り込みと名前の絞り込みは両方かかる', Box.view(ing, { ingredient: 'ほっこりポテト', query: 'n10' }).items.map((x) => x.i), [10]);
+  eq('どの個体も持たない食材なら0匹で1ページ', (() => { const v = Box.view(ing, { ingredient: 'ピュアなオイル' }); return [v.count, v.pages]; })(), [0, 1]);
+  eq('絞り込みの結果がページに収まらなければ分ける', Box.view(rows.concat(rows), { ingredient: 'あまいミツ' }).pages, 5);
+
+  const mixed = rows.map((r, i) => (i === 3 || i === 40 ? Box.pack(row({ nickname: `n${i}`, species: 'ふしぎ' })) : r));
+  eq('要確認の数はBOX全体で数える', Box.view(mixed, { query: 'n4' }).flagged, 2);
+  eq('要確認だけに絞り込める', Box.view(mixed, { onlyFlag: true }).items.map((x) => x.i), [3, 40]);
+  eq('要確認だけでも名前で重ねて絞り込める', Box.view(mixed, { onlyFlag: true, query: 'n40' }).items.map((x) => x.i), [40]);
+  eq('要確認の印は各個体に付く', Box.view(mixed, {}).items.filter((x) => x.flag).map((x) => x.i), [3]);
+
+  eq('クリップボードを読めなかったときは長押しで貼り付ける案内', Box.clipboardNotice(null), 'クリップボードを読めませんでした。下の欄に長押しで貼り付けてください。');
+  eq('クリップボードが空でも案内する', /空でした/.test(Box.clipboardNotice('  \n')), true);
+  eq('クリップボードに中身があれば案内はない', Box.clipboardNotice('a,b'), '');
+}
+
 // CSV・TSV の読み込み
 {
   const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });

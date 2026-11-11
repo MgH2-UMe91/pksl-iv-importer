@@ -95,7 +95,7 @@ input[type="text"], input[type="number"], input[type="search"], select, textarea
   font: inherit;
 }
 
-textarea { font-family: ui-monospace, Consolas, monospace; font-size: 0.85rem; margin-top: 8px; }
+textarea { font-family: ui-monospace, Consolas, monospace; margin-top: 8px; }
 
 .row { padding: 12px 0; border-top: 1px solid var(--line); }
 .row:first-child { border-top: 0; }
@@ -340,3 +340,20 @@ button[hidden] { display: none; }
 .import-panel textarea { width: 100%; }
 .import-problems { margin: 0; padding-left: 1.2em; color: var(--low-line); font-size: 0.9rem; }
 .import-problems:empty { display: none; }
+
+/* iPhone の Safari は、文字が16px未満の入力欄に触ると画面を拡大してしまう。入力欄の文字は16px以上にそろえる */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select { font-size: max(16px, 1rem); }
+
+/* BOX のリストを縦に詰める */
+.box-list { gap: 4px; margin: 6px 0; }
+.box-list li { padding: 4px 8px; border-radius: 6px; }
+.box-list .bhead { padding-right: 38px; line-height: 1.35; }
+.box-list .bl2 { margin-top: 2px; gap: 4px; }
+.box-list .ico.sm { width: 22px; height: 22px; padding: 2px; }
+.box-list .bx { top: 4px; right: 6px; min-height: 28px; min-width: 28px; }
+.box-tools { grid-template-columns: 1fr 1fr; }
+.box-tools #box-filter { grid-column: 1 / -1; }
+.box-tools select { width: 100%; min-width: 0; }
+.box-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 6px 0; }
+.box-pager button { min-height: 38px; padding: 4px 14px; }
+.box-flag { display: block; width: 100%; text-align: left; margin: 6px 0 0; padding: 6px 10px; min-height: 0; border: 2px solid var(--low-line); color: var(--low-line); font-size: 0.9rem; line-height: 1.4; }

@@ -7,6 +7,8 @@ const BoxUi = (() => {
   let boxes = [Box.load(1), Box.load(2)];
   let active = 1;        // 5 で見ている BOX
   let restoredFrom = 0;  // 3 へ戻した元の BOX(0 なら戻していない)
+  let page = 0;          // 5 のリストのページ(0始まり)。絞り込み・並べ替え・BOX の切り替えで1ページ目に戻る
+  let onlyFlag = false;  // 要確認の個体だけを表示しているか
   let editing = null;    // 5 で開いている1匹の編集欄 { idx: BOX の中の番号, row: 編集中の行 }
   let savedSig = '';     // 最後に保存した(または戻した)ときの 3 の中身。違えば「保存していない行がある」
   const enabled = () => Install.standalone();
@@ -70,34 +72,46 @@ const BoxUi = (() => {
     g('box-tabs').innerHTML = [1, 2].map((n) => `<button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}">${esc(nameOf(n))} <small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button>`).join('');
   }
 
+  const viewOpts = () => ({ query: g('box-filter').value, ingredient: g('box-ing').value, onlyFlag, sort: g('box-sort').value, page });
+
   function renderList() {
     const data = boxes[active - 1];
-    const q = Match.fold(g('box-filter').value.trim());
-    const items = data.rows.map((a, i) => ({ a, i })).filter(({ a }) => !q || Match.fold(`${a[1]} ${a[0]}`).includes(q));
-    const sort = g('box-sort').value;
-    if (sort === 'newest') items.reverse();
-    else if (sort === 'species') items.sort((x, y) => String(x.a[1]).localeCompare(String(y.a[1]), 'ja') || x.i - y.i);
-    else if (sort === 'level') items.sort((x, y) => (y.a[2] ?? 0) - (x.a[2] ?? 0) || x.i - y.i);
-    g('box-list').innerHTML = items.map(({ a, i }) => {
+    const v = Box.view(data.rows, viewOpts());
+    page = v.page;
+    if (onlyFlag && !v.flagged) onlyFlag = false; // 要確認がなくなったら、絞り込みを外す
+    g('box-list').innerHTML = v.items.map(({ a, i, flag }) => {
       const ings = a[4].map((n) => (n ? `<span class="ico sm" title="${esc(n)}" aria-label="${esc(n)}">${INGREDIENT_ICONS[n] ?? ''}</span>` : '<span class="ico sm none" title="未選択">−</span>')).join('');
       const who = `${esc(a[1])}${a[0] ? `(${esc(a[0])})` : ''}`;
       const open = editing && editing.idx === i;
-      const flag = Box.needsCheck(a);
       return `<li data-i="${i}" class="${open ? 'open' : ''}${flag ? ' flag' : ''}"><div class="bhead" role="button" tabindex="0" aria-expanded="${!!open}" data-open="${i}" aria-label="${who}を編集する"><div class="bl1"><b>${esc(a[1] || '(種族なし)')}</b><span class="bnick">${esc(a[0])}</span><span class="blv">Lv${a[2] ?? '?'}</span></div><div class="bl2">${ings}<span class="bnat">${esc(a[5])}</span></div></div><button type="button" class="bx" data-del="${i}" aria-label="${who}を消す">✕</button></li>`;
     }).join('');
     if (editing) {
       const li = g('box-list').querySelector(`li[data-i="${editing.idx}"]`);
       if (li) mountEditor(li);
-      else closeEdit(); // 絞り込みで見えなくなったときは閉じる
+      else closeEdit(); // 絞り込みやページ送りで見えなくなったときは閉じる
     }
     const total = data.rows.length;
-    const flagged = data.rows.filter(Box.needsCheck).length; // 辞書にない値などで、出力できない個体
-    g('box-flag').textContent = flagged ? `確認が必要な個体が${flagged}匹あります(オレンジ枠の行を押して直してください)。直すまで、CSVのコピー・保存(ファイル)はできません。` : '';
-    g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : q ? `${total}匹のうち${items.length}匹を表示しています。` : `${total}匹`)
+    const flagged = v.flagged; // 辞書にない値などで、出力できない個体
+    const fb = g('box-flag');
+    fb.hidden = !flagged;
+    fb.textContent = onlyFlag
+      ? `オレンジ枠の${flagged}匹だけを表示中です。押すと、すべての個体の表示に戻ります。`
+      : `確認が必要な個体が${flagged}匹あります。押すと、その個体だけを表示します。直すまで、CSVのコピー・保存(ファイル)はできません。`;
+    const filtering = g('box-filter').value.trim() || g('box-ing').value || onlyFlag;
+    g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${total}匹のうち${v.count}匹を表示しています。` : `${total}匹`)
       + (data.broken ? ' 保存の中身の一部を読めなかったため、読めた分だけを出しています。' : '');
+    // ページ送り(1ページ30匹)。1ページに収まるときは出さない
+    for (const id of ['box-pager-top', 'box-pager-bottom']) {
+      const el = g(id);
+      el.hidden = v.pages <= 1;
+      el.innerHTML = `<button type="button" data-page="${v.page - 1}"${v.page === 0 ? ' disabled' : ''}>‹ 前へ</button><span>${v.page + 1}/${v.pages}</span><button type="button" data-page="${v.page + 1}"${v.page >= v.pages - 1 ? ' disabled' : ''}>次へ ›</button>`;
+    }
     for (const id of ['box-restore', 'box-clear']) g(id).disabled = total === 0;
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
   }
+
+  // 絞り込み・並べ替えを変えたら1ページ目に戻る
+  const firstPage = () => { page = 0; closeEdit(); renderList(); };
 
   // ---- 1匹ずつ直す ----
   // 3の行の編集欄(app.js の rowHtml)をそのまま使う。編集中の行は extraRows に登録して、入力・進化・種族の検索も同じ部品で動かす
@@ -253,7 +267,7 @@ const BoxUi = (() => {
     g('box-import-problems').innerHTML = r.problems.map((x) => `<li>${x.line ? `${x.line}行目: ` : ''}${esc(x.message)}</li>`).join('');
     g('box-import-warn').textContent = '';
     g('box-import-result').textContent = '';
-    if (!count) { g('box-import-result').textContent = '読み込めた個体はありませんでした。'; return; }
+    if (!count) { g('box-import-result').textContent = '読み込めた個体はありませんでした。'; return; } // 貼り付け欄は残す(直して読み直せる)
     if (!plan.fits) {
       // 入りきらないときは1匹も入れない(4の保存と同じ判定)
       g('box-import-warn').textContent = `${nameOf(n)}にはあと${plan.room}匹しか入りません。${count}匹は入らないので、${nameOf(3 - n)}へ読み込むか、CSVの個体を減らしてください。`;
@@ -265,6 +279,7 @@ const BoxUi = (() => {
       return;
     }
     boxes[n - 1] = Box.load(n);
+    g('box-import-text').value = ''; // 読み込めたら貼り付け欄を空にする
     const check = r.rows.filter((x) => Box.needsCheck(Box.pack(x))).length;
     renderAll();
     renderSave(okNow());
@@ -278,14 +293,29 @@ const BoxUi = (() => {
       const t = ev.target.closest('[data-tab]');
       if (!t) return;
       active = Number(t.dataset.tab);
+      page = 0;
+      onlyFlag = false;
       closeEdit();
       closeAsk();
       for (const id of ['box-import-warn', 'box-import-result']) g(id).textContent = '';
       g('box-import-problems').innerHTML = '';
       renderAll();
     });
-    g('box-filter').addEventListener('input', renderList);
-    g('box-sort').addEventListener('change', renderList);
+    g('box-ing').innerHTML = '<option value="">食材: すべて</option>' + INGREDIENTS.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    g('box-filter').addEventListener('input', firstPage);
+    g('box-ing').addEventListener('change', firstPage);
+    g('box-sort').addEventListener('change', firstPage);
+    g('box-flag').addEventListener('click', () => { onlyFlag = !onlyFlag; firstPage(); });
+    for (const id of ['box-pager-top', 'box-pager-bottom']) {
+      g(id).addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-page]');
+        if (!b || b.disabled) return;
+        page = Number(b.dataset.page);
+        closeEdit();
+        renderList();
+        if (id === 'box-pager-bottom') g('box-tabs').scrollIntoView({ block: 'start' }); // 下で送ったときは、リストの先頭へ戻る
+      });
+    }
     bindRowEvents(g('box-list')); // 編集欄の入力は、3の行と同じ処理
     g('box-list').addEventListener('click', (ev) => {
       if (ev.target.closest('#box-edit-save')) { saveEdit(); return; }
@@ -319,6 +349,19 @@ const BoxUi = (() => {
       catch (e) { g('box-import-warn').textContent = `ファイルを読めませんでした: ${e.message}`; }
     });
     g('box-import-run').addEventListener('click', () => importInto(g('box-import-text').value));
+    g('box-import-clip').addEventListener('click', async () => {
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch (e) { text = null; }
+      if (text === null || !text.trim()) {
+        // 読めない・許可されない・空のとき: 貼り付け欄で長押しして貼り付けてもらう
+        g('box-import-problems').innerHTML = '';
+        g('box-import-result').textContent = '';
+        g('box-import-warn').textContent = Box.clipboardNotice(text);
+        g('box-import-text').focus();
+        return;
+      }
+      importInto(text);
+    });
     g('box-rename').addEventListener('click', rename);
     g('box-copy').addEventListener('click', copy);
     g('box-file').addEventListener('click', file);

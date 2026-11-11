@@ -96,6 +96,7 @@
     <div class="box-tabs" id="box-tabs" role="tablist"></div>
     <div class="box-tools">
       <input id="box-filter" type="search" placeholder="名前・ニックネームで絞り込む" autocomplete="off" aria-label="名前・ニックネームで絞り込む">
+      <select id="box-ing" aria-label="食材で絞り込む"></select>
       <select id="box-sort" aria-label="並べ替え">
         <option value="added">追加順</option>
         <option value="newest">新しい順</option>
@@ -104,8 +105,10 @@
       </select>
     </div>
     <p id="box-count" class="note" role="status"></p>
-    <p id="box-flag" class="box-warn" role="status"></p>
+    <button id="box-flag" type="button" class="box-flag" hidden></button>
+    <div id="box-pager-top" class="box-pager" hidden></div>
     <ul id="box-list" class="box-list"></ul>
+    <div id="box-pager-bottom" class="box-pager" hidden></div>
     <div class="actions box-actions">
       <button id="box-rename" type="button">名前を変える</button>
       <button id="box-copy" type="button">CSVをコピー</button>
@@ -116,6 +119,7 @@
     </div>
     <div id="box-import-panel" class="import-panel" hidden>
       <p id="box-import-note" class="note"></p>
+      <div class="actions"><button id="box-import-clip" type="button" class="primary">クリップボードから読み込む</button></div>
       <div class="actions"><label class="button">ファイルを選ぶ<input id="box-import-file" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden></label></div>
       <label class="field"><span>または、ここに貼り付けて読み込む</span><textarea id="box-import-text" rows="4" placeholder="1行目が列名のCSVを貼り付けてください" autocomplete="off"></textarea></label>
       <div class="actions"><button id="box-import-run" type="button" class="primary">貼り付けた内容を読み込む</button></div>
