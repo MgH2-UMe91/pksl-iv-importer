@@ -1,0 +1,64 @@
+// BOX(端末の localStorage に残す保存先)。画面を持たない部分: 保存・読み出し・上限の判定・名前
+// 文字の情報だけを残し、画像は保存しない。BOX は 2 つ、1 つにつき 300 匹まで
+'use strict';
+
+const Box = (() => {
+  const MAX = 300;
+  const COUNT = 2;
+  const NAME_MAX = 10; // 全角で 10 文字まで
+  const key = (n) => `iv-importer-box-${n}`;
+  const defaultName = (n) => `BOX${n}`;
+
+  // 名前に使う文字列を整える。改行は空白にし、10 文字までに切る。空なら '' (既定の名前に戻る)
+  const cleanName = (s) => Array.from(String(s ?? '').replace(/[\r\n\t]+/g, ' ').trim()).slice(0, NAME_MAX).join('');
+  const nameOf = (data, n) => data.name || defaultName(n);
+  // ファイル名に使えない記号は _ にする
+  const fileName = (name) => `${String(name).replace(/[\\/:*?"<>|]/g, '_')}.csv`;
+
+  // 1 匹を短い配列にして保存する。順番: ニックネーム, 種族, レベル, スキルレベル, 食材×3, 性格, サブ×5, 色違い, ミント, 眠った時間
+  // 銀種を使っている個体は、使った後のサブスキル(CSV に出る値)をそのまま保存し、銀種の印は残さない
+  const pack = (row) => [
+    row.nickname, row.species, Number.isFinite(row.level) ? row.level : null, row.skillLevel === '' ? null : row.skillLevel,
+    row.ing.slice(0, 3), row.nature, row.sub.slice(0, 5), row.shiny ? 1 : 0, row.mint ? 1 : 0, row.ribbon || 0,
+  ];
+  const unpack = (a) => ({
+    nickname: a[0], species: a[1], level: a[2] ?? NaN, skillLevel: a[3] ?? '',
+    ing: [...a[4]], nature: a[5], sub: [...a[6]], shiny: a[7] === 1, mint: a[8] === 1, ribbon: a[9] || 0,
+    seed: false, base: null, // 銀種を使った後のサブスキルが、その個体のサブスキルとして保存される。戻したときは銀種のチェックなしから始める
+  });
+  const valid = (a) => Array.isArray(a) && a.length >= 10 && Array.isArray(a[4]) && a[4].length === 3 && Array.isArray(a[6]) && a[6].length === 5;
+
+  function load(n) {
+    try {
+      const raw = localStorage.getItem(key(n));
+      if (raw === null) return { name: '', rows: [], broken: false };
+      const o = JSON.parse(raw);
+      const rows = Array.isArray(o?.rows) ? o.rows.filter(valid).slice(0, MAX) : [];
+      return { name: cleanName(o?.name), rows, broken: !Array.isArray(o?.rows) || rows.length !== o.rows.length };
+    } catch (e) { return { name: '', rows: [], broken: true }; }
+  }
+  // 保存できたら true。容量の上限などで失敗したら false
+  function save(n, data) {
+    try {
+      localStorage.setItem(key(n), JSON.stringify({ v: 1, name: cleanName(data.name), rows: data.rows }));
+      return true;
+    } catch (e) { return false; }
+  }
+  const bytes = (n) => { try { const raw = localStorage.getItem(key(n)); return raw === null ? 0 : (key(n).length + raw.length) * 2; } catch (e) { return 0; } };
+
+  // count 匹を各 BOX に保存できるか。overwrite はその BOX の中身を置き換える(3へ戻した元の BOX)
+  // 返す値: BOX ごとの { fits, room }。room は追加で入る数(上書きなら 300)
+  function plan(count, lengths, overwrite = 0) {
+    return lengths.map((len, i) => {
+      const room = overwrite === i + 1 ? MAX : MAX - len;
+      return { fits: count <= room, room };
+    });
+  }
+
+  // idx 番目の1匹だけを packed に替えた新しい配列を返す。並び順と件数は変えず、元の配列も変えない。範囲外なら何も変えない
+  const replaceAt = (rows, idx, packed) => (Number.isInteger(idx) && idx >= 0 && idx < rows.length ? rows.map((r, i) => (i === idx ? packed : r)) : rows.slice());
+
+  const csv = (rows) => Csv.build(rows.map(unpack));
+
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, csv };
+})();

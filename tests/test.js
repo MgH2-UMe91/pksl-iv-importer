@@ -157,6 +157,99 @@ const noChange = row({ seed: false, base: null, sub: ['きのみの数S', 'お�
 Match.setSeed(noChange, true);
 eq('変化しないサブスキルはそのまま', noChange.sub, ['きのみの数S', 'おてつだいボーナス', '', '', '']);
 
+// BOX
+eq('名前は全角10文字まで', Box.cleanName('あいうえおかきくけこさし'), 'あいうえおかきくけこ');
+eq('名前の前後の空白は消す', Box.cleanName('  ぼっくす  '), 'ぼっくす');
+eq('名前が空なら既定の名前に戻る', Box.nameOf({ name: Box.cleanName('   ') }, 2), 'BOX2');
+eq('付けた名前を使う', Box.nameOf({ name: '本命' }, 1), '本命');
+eq('ファイル名に使えない記号は _ にする', Box.fileName('a/b:c*d?e"f<g>h|i' + String.fromCharCode(92) + 'j'), 'a_b_c_d_e_f_g_h_i_j.csv');
+eq('普通の名前はそのままファイル名にする', Box.fileName('本命BOX'), '本命BOX.csv');
+eq('250匹入っているBOXに70匹は入らない', Box.plan(70, [250, 0]), [{ fits: false, room: 50 }, { fits: true, room: 300 }]);
+eq('ちょうど300匹になるなら入る', Box.plan(50, [250, 300]), [{ fits: true, room: 50 }, { fits: false, room: 0 }]);
+eq('両方に入らないこともある', Box.plan(100, [250, 280]).map((x) => x.fits), [false, false]);
+eq('上書きなら元の中身を数えない(300匹のBOXに300匹)', Box.plan(300, [300, 10], 1).map((x) => x.fits), [true, false]);
+eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1).map((x) => x.fits), [false, false]);
+{
+  const r = row({ nickname: 'たろう', skillLevel: 6, shiny: true, mint: true, ribbon: 500, sub: ['おてつだいボーナス', 'きのみの数S', '', '', ''] });
+  const back = Box.unpack(JSON.parse(JSON.stringify(Box.pack(r))));
+  eq('保存して戻しても同じ内容', back, { nickname: 'たろう', species: r.species, level: r.level, skillLevel: 6, ing: r.ing, nature: r.nature, sub: r.sub, shiny: true, mint: true, ribbon: 500, seed: false, base: null });
+  const seeded = Box.unpack(JSON.parse(JSON.stringify(Box.pack(row({ seed: true, base: ['スキルレベルアップS', '', '', '', ''], sub: ['スキルレベルアップM', '', '', '', ''] })))));
+  eq('銀種を使った後のサブスキルをそのまま保存し、銀種の印は残さない', [seeded.seed, seeded.base, seeded.sub[0]], [false, null, 'スキルレベルアップM']);
+  eq('保存する中身に銀種の欄はない', Box.pack(row({ seed: true, base: ['スキルレベルアップS', '', '', '', ''] })).length, 10);
+  eq('戻したあとに銀種を使うと、保存したサブスキルがさらに一段上がる(最大所持数アップM→L)', Match.applySeed(['最大所持数アップM', '', '', '', ''])[0], '最大所持数アップL');
+  const three = [Box.pack(row({ nickname: 'a' })), Box.pack(row({ nickname: 'b' })), Box.pack(row({ nickname: 'c' }))];
+  const edited = Box.replaceAt(three, 1, Box.pack(row({ nickname: 'B', level: 70 })));
+  eq('1匹の書き換えで件数は変わらない', edited.length, 3);
+  eq('書き換えるのは指定した1匹だけ(並び順も同じ)', edited.map((x) => x[0]), ['a', 'B', 'c']);
+  eq('ほかの個体は同じ内容のまま', [edited[0], edited[2]], [three[0], three[2]]);
+  eq('元の配列は書き換えない', three.map((x) => x[0]), ['a', 'b', 'c']);
+  eq('範囲外の番号なら何も変えない', [Box.replaceAt(three, 3, three[0]), Box.replaceAt(three, -1, three[0])].map((x) => x.map((y) => y[0]).join('')), ['abc', 'abc']);
+  eq('BOXのCSVは3のCSVと同じ', Box.csv([Box.pack(r)]), Csv.build([r]));
+  eq('レベルとスキルレベルが空でも戻せる', Box.unpack(JSON.parse(JSON.stringify(Box.pack(row({ level: NaN, skillLevel: '' }))))).level, NaN);
+  const n = 9; // 試験用の番号(実際の BOX 1・2 には触らない)
+  eq('保存して読み出せる', Box.save(n, { name: 'てすと', rows: [Box.pack(r), Box.pack(r)] }) && Box.load(n).rows.length, 2);
+  eq('名前も一緒に保存される', Box.load(n).name, 'てすと');
+  localStorage.setItem(Box.key(n), '{こわれた');
+  eq('壊れた保存は空として読む', Box.load(n), { name: '', rows: [], broken: true });
+  localStorage.removeItem(Box.key(n));
+  eq('何もなければ空', Box.load(n), { name: '', rows: [], broken: false });
+}
+
+// CSV・TSV の読み込み
+{
+  const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });
+  const mine = [
+    row({ nickname: 'たろう', skillLevel: 6, shiny: true, mint: true, ribbon: 1000, sub: ['おてつだいボーナス', 'きのみの数S', '', '', ''] }),
+    row({ nickname: 'a,b "c"', species: 'カメックス', level: 61, skillLevel: 5, ing: ['モーモーミルク', 'モーモーミルク', 'マメミート'], nature: 'ひかえめ', sub: ['スキル確率アップM', '', '', '', ''] }),
+    row({ nickname: '', skillLevel: '', ribbon: 200 }),
+  ];
+  const back = Import.parse(Csv.build(mine));
+  eq('このアプリのCSVは往復して同じ内容に戻る', back.rows.map(pick), mine.map((r) => pick({ ...r, ribbon: r.ribbon ?? 0, mint: !!r.mint, shiny: !!r.shiny })));
+  eq('往復で確認の印も注意も付かない', back.rows.map((r) => [r.low.length, r.notes.length]), [[0, 0], [0, 0], [0, 0]]);
+  eq('往復で問題は出ない', back.problems, []);
+
+  const nito = [
+    'ニックネーム,ポケモン,レベル,スキルレベル,食材1,食材2,食材3,メインスキル,せいかく,まっしろミント,Lv10,Lv25,Lv50,Lv70,Lv80,一緒に眠った時間,色違い,お気に入り',
+    'しぐれ,カメックス,61,5,モーモーミルク,モーモーミルク,モーモーミルク,食材ゲットS,ひかえめ,1,おてつだいスピードM,きのみの数S,,,,700,1,🔴🔵',
+    ',フシギダネ,30,3,あまいミツ,あんみんトマト,,,ようき,0,,,,,,0,0,',
+  ].join('\n');
+  const n = Import.parse(nito);
+  eq('個体値計算機の日本語のエクスポート: 2匹読める', n.rows.length, 2);
+  eq('個体値計算機: 名前・レベル・食材・性格', [n.rows[0].nickname, n.rows[0].species, n.rows[0].level, n.rows[0].skillLevel, n.rows[0].ing, n.rows[0].nature], ['しぐれ', 'カメックス', 61, 5, ['モーモーミルク', 'モーモーミルク', 'モーモーミルク'], 'ひかえめ']);
+  eq('個体値計算機: サブスキルは Lv10/25/50/70/80 の順', n.rows[0].sub, ['おてつだいスピードM', 'きのみの数S', '', '', '']);
+  eq('個体値計算機: 700時間は500の段階、ミントと色違いは1', [n.rows[0].ribbon, n.rows[0].mint, n.rows[0].shiny], [500, true, true]);
+  eq('個体値計算機: メインスキルとお気に入りは読まない(印も付かない)', [n.rows[0].low, n.rows[0].notes], [[], []]);
+  eq('個体値計算機: 食材3が空でも読める', [n.rows[1].ing, n.rows[1].ribbon, n.rows[1].mint], [['あまいミツ', 'あんみんトマト', ''], 0, false]);
+  eq('ribbon の段階の区切り', ['199', '200', '499', '500', '999', '1000', '1999', '2000', '', 'x'].map((h) => Import.parse(`ポケモン,ribbon\nフシギダネ,${h}`).rows[0].ribbon), [0, 200, 200, 500, 500, 1000, 1000, 2000, 0, 0]);
+
+  const en = Import.parse('Pokemon,Ingredient 1,sleeping time shared,mint,shiny,nickname,level,nature,skill level\nフシギダネ,あまいミツ,1000,true,TRUE,さん,10,ようき,2');
+  eq('英語の列名と順番違い、true も受け付ける', pick(en.rows[0]), { nickname: 'さん', species: 'フシギダネ', level: 10, skillLevel: 2, ing: ['あまいミツ', '', ''], nature: 'ようき', sub: ['', '', '', '', ''], shiny: true, mint: true, ribbon: 1000 });
+  const tsv = Import.parse('ニックネーム\tポケモン\tレベル\nたろう\tフシギダネ\t12');
+  eq('タブ区切り(TSV)も読める', [tsv.rows[0].nickname, tsv.rows[0].species, tsv.rows[0].level], ['たろう', 'フシギダネ', 12]);
+  const bom = Import.parse('﻿nickname,Pokemon,level\r\nあ,フシギダネ,5\r\nい,フシギダネ,6\r\n');
+  eq('BOM と CRLF があっても読める', bom.rows.map((r) => r.nickname + r.level), ['あ5', 'い6']);
+  eq('ニックネームのカンマ・引用符・値の中の改行', Import.parse('nickname,Pokemon,level\n"a,b ""c""",フシギダネ,5\n"x\ny",フシギダネ,6').rows.map((r) => r.nickname), ['a,b "c"', 'x\ny']);
+  eq('行番号は値の中の改行を数える', Import.parse('nickname,Pokemon,level\n"x\ny",フシギダネ,6\nz,フシギダネ,7').rows.map((r) => r.line), [2, 4]);
+
+  const odd = Import.parse('nickname,Pokemon,level,nature,Lv10,ing 2\nあ,ポケモンでない,5,ふしぎ,ねむけ,へんなもの');
+  eq('辞書にない名前は種族を空にして印と注意を付ける', [odd.rows[0].species, odd.rows[0].nickname, odd.rows[0].low.includes('species')], ['', 'あ', true]);
+  eq('辞書にない性格・サブ・食材は値を残して印を付ける', [odd.rows[0].nature, odd.rows[0].sub[0], odd.rows[0].ing[1], odd.rows[0].low.slice(1)], ['ふしぎ', 'ねむけ', 'へんなもの', ['ing', 'nature', 'sub0']]);
+  eq('辞書にない値は3の検査で止まる(出力しない)', Match.checkRow({ ...odd.rows[0], pending: false }).errors.length > 0, true);
+  eq('英語名は辞書にないので印が付く', Import.parse('Pokemon\nBulbasaur').rows[0].low, ['species', 'level']);
+  eq('レベルがなければ印と注意を付ける', [Import.parse('Pokemon\nフシギダネ').rows[0].low, Number.isNaN(Import.parse('Pokemon\nフシギダネ').rows[0].level)], [['level'], true]);
+  eq('食材1は種族で決まる(相手のインポートと同じ)', Import.parse('Pokemon,ing 1,ing 2\nフシギダネ,げきからハーブ,あんみんトマト').rows[0].ing, ['あまいミツ', 'あんみんトマト', '']);
+  eq('空行は読み飛ばす', Import.parse('Pokemon,level\nフシギダネ,5\n\n,\nフシギダネ,6\n').rows.length, 2);
+
+  eq('壊れた行: 引用符が閉じていない', Import.parse('nickname,Pokemon,level\nあ,フシギダネ,5\n"い,フシギダネ,6\nう,フシギダネ,7').problems, [{ line: 3, message: '引用符(")が閉じていません。ここから先は読めませんでした。' }]);
+  eq('壊れた行より前の行は読める', Import.parse('nickname,Pokemon,level\nあ,フシギダネ,5\n"い,フシギダネ,6').rows.map((r) => r.nickname), ['あ']);
+  eq('列名がなければ止める', Import.parse('あ,い,う\nえ,お,か').problems.length, 1);
+  eq('個体値計算機のテキスト形式は対応外と案内する', /テキスト形式/.test(Import.parse('abcdefghijkl@nick').problems[0].message), true);
+  eq('空の中身', Import.parse('  \n').rows.length + Import.parse('  \n').problems.length, 1);
+  eq('列名だけで個体がなければ案内する', Import.parse('nickname,Pokemon,level').problems.length, 1);
+  eq('UTF-8 のバイト列を読める', Import.decode(new TextEncoder().encode('ポケモン')), 'ポケモン');
+  eq('Shift_JIS のバイト列も読める', Import.decode(new Uint8Array([0x83, 0x7C, 0x83, 0x50, 0x83, 0x82, 0x83, 0x93]).buffer), 'ポケモン');
+}
+
 // 進化の系統
 const inLines = POKEMON.map((p) => p.name).filter((n) => Match.line(n).includes(n));
 eq('全種族がどれかの系統に入る', inLines.length, POKEMON.length);

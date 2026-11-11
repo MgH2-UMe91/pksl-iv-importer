@@ -4,7 +4,7 @@
 // - vendor/ は大きくて変わらないので保存優先
 // - 一覧にないファイル(tests/ など)と別サイトへの通信には関わらない
 // ファイルを増やすか vendor/ を入れ替えたら、下の一覧を直して VERSION を上げること
-const VERSION = '21';
+const VERSION = '23';
 const PREFIX = 'iv-importer-';
 const CACHE = PREFIX + VERSION;
 const NET_WAIT_MS = 4000;
@@ -12,7 +12,7 @@ const NET_WAIT_MS = 4000;
 const APP_FILES = [
   'index.html', 'manifest.webmanifest',
   'css/style.css',
-  'js/match.js', 'js/csv.js', 'js/reader.js', 'js/install.js', 'js/app.js',
+  'js/match.js', 'js/csv.js', 'js/reader.js', 'js/install.js', 'js/import.js', 'js/box.js', 'js/boxui.js', 'js/app.js',
   'data/pokemon.js', 'data/dict.js', 'data/icons.js', 'data/evolution.js',
   'icons/icon.svg', 'icons/icon-32.png', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png',
 ];

@@ -7,6 +7,10 @@ const $ = (id) => document.getElementById(id);
 
 const state = { rows: [], bulkLevel: null, bulkSkill: null, bulkSeed: false, bulkRibbon: null, bulkSpecies: '', nextId: 1 }; // bulkLevel と bulkSkill が null なら読み取った値を使う
 
+// 3の一覧に入っていない行(BOX の編集欄で開いている1匹)。rowOf で見つけられるようにここに登録する
+const extraRows = new Map();
+const rowEl = (row) => document.querySelector(`.row[data-id="${row.id}"]`);
+
 function newRow(image = null) {
   return {
     id: state.nextId++, image,
@@ -115,14 +119,15 @@ function evolutionField(row) {
     </div>`;
 }
 
-function rowHtml(row) {
+// box が true のときは、BOX の編集欄用(元のスクショの欄、銀種のチェック、「この行を削除」を出さない)
+function rowHtml(row, box = false) {
   const own = Match.ingredientsOf(row.species) ?? INGREDIENTS;
   const thumb = row.image
     ? `<a href="${row.image}" target="_blank" rel="noopener"><img src="${row.icon || row.image}" alt="元のスクショを開く"></a>`
     : '<div class="empty">画像なし</div>';
   return `
-    <div class="head">
-      <div class="thumb">${thumb}</div>
+    <div class="head${box ? ' nothumb' : ''}">
+      ${box ? '' : `<div class="thumb">${thumb}</div>`}
       <div class="head-fields">
         <div class="field" data-key="species"><span>ポケモン</span>
           <input type="text" data-species value="${esc(row.species)}" placeholder="名前で検索" autocomplete="off">
@@ -140,10 +145,10 @@ function rowHtml(row) {
       <label class="field" data-key="ribbon"><span>一緒に眠った時間</span><select data-edit="ribbon">${RIBBONS.map((h) => `<option value="${h}"${h === row.ribbon ? ' selected' : ''}>${RIBBON_LABELS[h]}</option>`).join('')}</select></label>
       ${ingredientField(row, own)}
       ${row.sub.map((s, i) => selectField(`サブ${i + 1}`, `sub${i}`, s, SUBSKILLS, true)).join('')}
-      <div class="foot">
+      ${box ? '' : `<div class="foot">
         <label class="check"><input type="checkbox" data-edit="seed"${row.seed ? ' checked' : ''}>銀種を使う</label>
         <button class="remove" type="button" data-remove>この行を削除</button>
-      </div>
+      </div>`}
       <p class="field wide seed-note note" hidden></p>
     </div>
     <ul class="messages"></ul>`;
@@ -164,10 +169,72 @@ function addRow(row) {
   refresh();
 }
 
+// 3の一覧を、BOX から出した個体に置き換える。一括の指定は「読取」などの初期状態に戻す(値は各行に入っている)
+function loadRows(list) {
+  for (const r of state.rows) if (r.image) URL.revokeObjectURL(r.image);
+  state.rows = [];
+  $('rows').innerHTML = '';
+  state.bulkLevel = null; state.bulkSkill = null; state.bulkSeed = false; state.bulkRibbon = null;
+  for (const b of $('levels').children) b.classList.toggle('selected', b.dataset.level === 'null');
+  for (const b of $('skill-levels').children) b.classList.toggle('selected', b.dataset.level === 'null');
+  const frag = document.createDocumentFragment();
+  for (const p of list) {
+    const row = Object.assign(newRow(), p, { manualLevel: Number.isFinite(p.level) ? p.level : null, readSkill: p.skillLevel });
+    state.rows.push(row);
+    const el = document.createElement('div');
+    el.className = 'row';
+    el.dataset.id = row.id;
+    el.innerHTML = rowHtml(row);
+    frag.append(el);
+  }
+  $('rows').append(frag);
+  $('progress').textContent = '';
+  refresh(); // 300匹でも1回だけ
+}
+
+// 読み込んだ個体(Import.parse の結果)を、3の一覧の末尾に足す。いまの一覧は消さない
+// 一括の指定(レベルなど)は上書きせず、読み込んだ値を使う。オレンジ枠と注意の文は、辞書にない値のあった行に付く
+function appendRows(list) {
+  Install.dismiss();
+  const frag = document.createDocumentFragment();
+  for (const p of list) {
+    const { low, notes, line, ...fields } = p;
+    const row = Object.assign(newRow(), fields, { manualLevel: Number.isFinite(p.level) ? p.level : null, readSkill: p.skillLevel, low: new Set(low), notes });
+    state.rows.push(row);
+    const el = document.createElement('div');
+    el.className = 'row';
+    el.dataset.id = row.id;
+    el.innerHTML = rowHtml(row);
+    frag.append(el);
+  }
+  $('rows').append(frag);
+  refresh(); // 300匹でも1回だけ
+}
+
+// CSV・TSV の文字を読み込む。結果を画面に出す
+function importText(text) {
+  const r = Import.parse(text);
+  if (r.rows.length) appendRows(r.rows);
+  const check = r.rows.filter((x) => x.low.length || x.notes.length).length;
+  $('import-result').textContent = r.rows.length
+    ? `${r.rows.length}匹を3の一覧に足しました。${check ? `うち${check}匹は、オレンジ枠の項目を確認してください。` : ''}`
+    : '読み込めた個体はありませんでした。';
+  $('import-problems').innerHTML = r.problems.map((x) => `<li>${x.line ? `${x.line}行目: ` : ''}${esc(x.message)}</li>`).join('');
+  if (r.rows.length) $('list-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return r;
+}
+
 function renderRow(row) {
-  const el = $('rows').querySelector(`[data-id="${row.id}"]`);
-  el.innerHTML = rowHtml(row);
-  refresh();
+  rowEl(row).innerHTML = rowHtml(row, extraRows.has(row.id));
+  touch(row);
+}
+
+// 1行を直したあとの更新。3の行なら全体、BOX の編集欄の行ならその行だけ
+function touch(row) {
+  if (extraRows.has(row.id)) {
+    refreshRow(row, rowEl(row));
+    if (typeof BoxUi !== 'undefined') BoxUi.afterEdit(row);
+  } else refresh();
 }
 
 // ---------- 種族が決まっていない個体の一括選択 ----------
@@ -229,6 +296,25 @@ function showBulkChoices(input) {
   input.parentElement.append(ul);
 }
 
+// 1行の表示を整える(印・色・銀種の説明・注意とエラー)。エラーの一覧を返す
+function refreshRow(row, el) {
+  const { errors, warnings } = Match.checkRow(row);
+  for (const f of el.querySelectorAll('[data-key]')) {
+    // レベルの印は「読取」のときだけ。一括の値を選んだら、その値が入っている
+    f.classList.toggle('low', row.low.has(f.dataset.key) && !(f.dataset.key === 'level' && state.bulkLevel !== null && !extraRows.has(row.id)));
+    const sub = /^sub(\d)$/.exec(f.dataset.key); // 青・金のサブスキルは選択欄の値に合わせて色を付ける
+    if (sub) for (const c of ['blue', 'gold']) f.classList.toggle(c, SUBSKILL_COLORS[c].includes(row.sub[sub[1]]));
+  }
+  const changed = row.seed ? row.sub.map((s, k) => (s !== row.base[k] ? `${row.base[k]}→${s.slice(-1)}` : '')).filter(Boolean) : [];
+  const seedNote = el.querySelector('.seed-note');
+  seedNote.hidden = !row.seed;
+  seedNote.textContent = changed.length ? `銀種で変わる: ${changed.join('、')}` : '銀種を使っても変わりません。';
+  el.querySelector('[data-key="species"]').classList.toggle('missing', !row.species);
+  const notes = [...row.notes.map((t) => ['warning', t]), ...warnings.map((t) => ['warning', t]), ...errors.map((t) => ['error', t])];
+  el.querySelector('.messages').innerHTML = notes.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('');
+  return errors;
+}
+
 function refresh() {
   renderUnresolved();
   const has = state.rows.length > 0;
@@ -236,21 +322,7 @@ function refresh() {
 
   const problems = [];
   state.rows.forEach((row, i) => {
-    const { errors, warnings } = Match.checkRow(row);
-    const el = $('rows').querySelector(`[data-id="${row.id}"]`);
-    for (const f of el.querySelectorAll('[data-key]')) {
-      // レベルの印は「読取」のときだけ。一括の値を選んだら、その値が入っている
-      f.classList.toggle('low', row.low.has(f.dataset.key) && !(f.dataset.key === 'level' && state.bulkLevel !== null));
-      const sub = /^sub(\d)$/.exec(f.dataset.key); // 金のサブスキルは選択欄の値に合わせて金色にする
-      if (sub) for (const c of ['blue', 'gold']) f.classList.toggle(c, SUBSKILL_COLORS[c].includes(row.sub[sub[1]]));
-    }
-    const changed = row.seed ? row.sub.map((s, k) => (s !== row.base[k] ? `${row.base[k]}→${s.slice(-1)}` : '')).filter(Boolean) : [];
-    const seedNote = el.querySelector('.seed-note');
-    seedNote.hidden = !row.seed;
-    seedNote.textContent = changed.length ? `銀種で変わる: ${changed.join('、')}` : '銀種を使っても変わりません。';
-    el.querySelector('[data-key="species"]').classList.toggle('missing', !row.species);
-    const notes = [...row.notes.map((t) => ['warning', t]), ...warnings.map((t) => ['warning', t]), ...errors.map((t) => ['error', t])];
-    el.querySelector('.messages').innerHTML = notes.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('');
+    const errors = refreshRow(row, $('rows').querySelector(`[data-id="${row.id}"]`));
     for (const e of errors) problems.push(`${i + 1}匹目: ${e}`);
   });
 
@@ -267,6 +339,7 @@ function refresh() {
   $('copy').disabled = $('save').disabled = !ok;
   // 直す項目が残っている間は中身も出さない
   $('preview').value = ok ? Csv.build(state.rows) : '';
+  if (typeof BoxUi !== 'undefined') BoxUi.renderSave(ok);
 }
 
 // 行に入れるレベル。一括の値を選んでいればそれ、「読取」なら手で直した値、なければ読み取った値。どれもなければ空欄
@@ -389,7 +462,10 @@ function showChoices(input, row) {
   input.parentElement.append(ul);
 }
 
-const rowOf = (el) => state.rows.find((r) => r.id === Number(el.closest('.row').dataset.id));
+const rowOf = (el) => {
+  const id = Number(el.closest('.row').dataset.id);
+  return state.rows.find((r) => r.id === id) ?? extraRows.get(id);
+};
 
 function onEdit(ev) {
   const t = ev.target;
@@ -409,7 +485,7 @@ function onEdit(ev) {
   else if (/^ing\d$/.test(key)) row.ing[key[3]] = t.value;
   else if (/^sub\d$/.test(key)) Match.editSub(row, Number(key[3]), t.value);
   else row[key] = t.value;
-  refresh();
+  touch(row);
 }
 
 // ホーム画面のアプリとして開いたとき。画面全体ではなく中身だけをスクロールさせる(css の .standalone)
@@ -417,6 +493,32 @@ function detectStandalone() {
   if (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
     document.documentElement.classList.add('standalone');
   }
+}
+
+// 行の編集欄の操作(入力・進化・種族の検索)。3の一覧と、BOX の編集欄の両方に付ける
+function bindRowEvents(rows) {
+  rows.addEventListener('input', onEdit);
+  rows.addEventListener('change', onEdit);
+  rows.addEventListener('change', (ev) => {
+    if (ev.target.matches('[data-evo]')) evolveTo(rowOf(ev.target), ev.target.value);
+    else if (ev.target.matches('[data-evolve]')) setEvolve(rowOf(ev.target), ev.target.checked);
+  });
+  rows.addEventListener('input', (ev) => {
+    if (!ev.target.matches('[data-species]')) return;
+    const row = rowOf(ev.target);
+    const typed = Match.find(ev.target.value) ? ev.target.value : '';
+    if (typed !== row.species) { row.shown = ''; row.pending = false; } // 入力が変わったら、確定は離れたときに行う
+    row.species = typed;
+    showChoices(ev.target, row);
+    touch(row);
+  });
+  rows.addEventListener('focusin', (ev) => { if (ev.target.matches('[data-species]')) showChoices(ev.target, rowOf(ev.target)); });
+  rows.addEventListener('focusout', (ev) => {
+    if (!ev.target.matches('[data-species]')) return;
+    closeChoices();
+    const row = rowOf(ev.target);
+    if (Match.find(ev.target.value) && (ev.target.value !== row.species || !row.shown)) setSpecies(row, ev.target.value);
+  });
 }
 
 function init() {
@@ -484,30 +586,22 @@ function init() {
     ev.target.value = '';
   });
   $('add').addEventListener('click', () => addRow(newRow()));
+  $('import-open').addEventListener('click', () => {
+    const open = $('import-panel').hidden;
+    $('import-panel').hidden = !open;
+    $('import-open').setAttribute('aria-expanded', String(open));
+  });
+  $('import-file').addEventListener('change', async (ev) => {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    try { importText(Import.decode(await file.arrayBuffer())); }
+    catch (e) { $('import-result').textContent = `ファイルを読めませんでした: ${e.message}`; $('import-problems').innerHTML = ''; }
+  });
+  $('import-run').addEventListener('click', () => importText($('import-text').value));
 
   const rows = $('rows');
-  rows.addEventListener('input', onEdit);
-  rows.addEventListener('change', onEdit);
-  rows.addEventListener('change', (ev) => {
-    if (ev.target.matches('[data-evo]')) evolveTo(rowOf(ev.target), ev.target.value);
-    else if (ev.target.matches('[data-evolve]')) setEvolve(rowOf(ev.target), ev.target.checked);
-  });
-  rows.addEventListener('input', (ev) => {
-    if (!ev.target.matches('[data-species]')) return;
-    const row = rowOf(ev.target);
-    const typed = Match.find(ev.target.value) ? ev.target.value : '';
-    if (typed !== row.species) { row.shown = ''; row.pending = false; } // 入力が変わったら、確定は離れたときに行う
-    row.species = typed;
-    showChoices(ev.target, row);
-    refresh();
-  });
-  rows.addEventListener('focusin', (ev) => { if (ev.target.matches('[data-species]')) showChoices(ev.target, rowOf(ev.target)); });
-  rows.addEventListener('focusout', (ev) => {
-    if (!ev.target.matches('[data-species]')) return;
-    closeChoices();
-    const row = rowOf(ev.target);
-    if (Match.find(ev.target.value) && (ev.target.value !== row.species || !row.shown)) setSpecies(row, ev.target.value);
-  });
+  bindRowEvents(rows);
   document.addEventListener('click', (ev) => {
     const open = ev.target.closest('[data-combo-open]');
     if (open) {
@@ -549,6 +643,7 @@ function init() {
 }
 
 init();
+BoxUi.init();
 Install.init(() => state.rows.length > 0 || !!$('progress').textContent.startsWith('読み取り中'));
 
 // オフライン対応。使えない環境でもそのまま動く

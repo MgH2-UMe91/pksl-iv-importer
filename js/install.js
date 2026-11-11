@@ -3,7 +3,8 @@
 //           / 「もう表示しない」を押していない / 「あとで」から14日たっている
 // 読み取り中や、読み取った結果・手入力の行があるときは出さない(出ていても、操作を始めたら閉じる)
 // 保存は端末の localStorage だけ。使えなければ数えられないので出さない
-// IV Importer は端末に設定や記録を残さないので、ホーム画面のアプリとの引き継ぎの注意は要らない
+// BOX の保存はホーム画面のアプリの中だけ(ブラウザ版には保存しない)ので、ブラウザとアプリで保存が別になる注意は要らない
+// guide() は BOX のボタンの横の「追加のしかた」から開く。回数や「あとで」に関係なく出し、閉じるボタンだけにする
 const Install = (() => {
   const KEY = 'iv-importer-install';
   const LATER_MS = 14 * 86400000;
@@ -37,19 +38,22 @@ const Install = (() => {
     return !s.never && s.days.length >= 2 && Date.now() - s.laterAt >= LATER_MS;
   }
 
-  function show() {
-    if (!active || busy() || document.getElementById('installPop')) return;
+  function show(force = false) {
+    if ((!force && (!active || busy())) || document.getElementById('installPop')) return;
     const kind = os();
     const pop = document.createElement('section');
     pop.id = 'installPop'; pop.className = 'install-pop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'ホーム画面に追加');
     const steps = kind === 'ios'
       ? '<ol><li>画面の下(または上)の共有ボタン <span class="ip-ic" aria-hidden="true">⎙</span>(□に↑)をタップ</li><li>メニューを少し上へ送り、「ホーム画面に追加」をタップ</li><li>右上の「追加」をタップ</li></ol><p class="ip-small">Safari で開いているときの手順です。他のブラウザなら、Safari で開き直してください。</p>'
       : '<div class="ip-android"></div>';
-    pop.innerHTML = `<p class="ip-title">ホーム画面に追加できます</p>${steps}<div class="ip-btns"><button type="button" id="ipLater">あとで</button><button type="button" id="ipNever">もう表示しない</button></div>`;
+    pop.innerHTML = `<p class="ip-title">ホーム画面に追加できます</p>${steps}<div class="ip-btns">${force ? '<button type="button" id="ipClose">閉じる</button>' : '<button type="button" id="ipLater">あとで</button><button type="button" id="ipNever">もう表示しない</button>'}</div>`;
     document.body.append(pop);
     const later = () => { save({ laterAt: Date.now() }); close(); };
-    pop.querySelector('#ipLater').onclick = later;
-    pop.querySelector('#ipNever').onclick = () => { save({ never: true }); close(); };
+    if (force) pop.querySelector('#ipClose').onclick = () => { active = false; close(); };
+    else {
+      pop.querySelector('#ipLater').onclick = later;
+      pop.querySelector('#ipNever').onclick = () => { save({ never: true }); close(); };
+    }
     closer = close;
     if (kind === 'android') {
       const box = pop.querySelector('.ip-android');
@@ -73,6 +77,8 @@ const Install = (() => {
     // isBusy: 読み取り中や、行があるときに true を返す関数
     init(isBusy) { busy = isBusy; active = eligible(); if (active) setTimeout(show, 1500); },
     // 操作を始めたら閉じる(次の訪問でまた出る)
+    standalone,
+    guide() { active = true; show(true); },
     dismiss() { if (document.getElementById('installPop')) close(); active = false; },
     _test: { eligible, load, KEY },
   };
