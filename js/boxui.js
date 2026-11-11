@@ -82,7 +82,8 @@ const BoxUi = (() => {
       const ings = a[4].map((n) => (n ? `<span class="ico sm" title="${esc(n)}" aria-label="${esc(n)}">${INGREDIENT_ICONS[n] ?? ''}</span>` : '<span class="ico sm none" title="未選択">−</span>')).join('');
       const who = `${esc(a[1])}${a[0] ? `(${esc(a[0])})` : ''}`;
       const open = editing && editing.idx === i;
-      return `<li data-i="${i}"${open ? ' class="open"' : ''}><div class="bhead" role="button" tabindex="0" aria-expanded="${!!open}" data-open="${i}" aria-label="${who}を編集する"><div class="bl1"><b>${esc(a[1] || '(種族なし)')}</b><span class="bnick">${esc(a[0])}</span><span class="blv">Lv${a[2] ?? '?'}</span></div><div class="bl2">${ings}<span class="bnat">${esc(a[5])}</span></div></div><button type="button" class="bx" data-del="${i}" aria-label="${who}を消す">✕</button></li>`;
+      const flag = Box.needsCheck(a);
+      return `<li data-i="${i}" class="${open ? 'open' : ''}${flag ? ' flag' : ''}"><div class="bhead" role="button" tabindex="0" aria-expanded="${!!open}" data-open="${i}" aria-label="${who}を編集する"><div class="bl1"><b>${esc(a[1] || '(種族なし)')}</b><span class="bnick">${esc(a[0])}</span><span class="blv">Lv${a[2] ?? '?'}</span></div><div class="bl2">${ings}<span class="bnat">${esc(a[5])}</span></div></div><button type="button" class="bx" data-del="${i}" aria-label="${who}を消す">✕</button></li>`;
     }).join('');
     if (editing) {
       const li = g('box-list').querySelector(`li[data-i="${editing.idx}"]`);
@@ -90,9 +91,12 @@ const BoxUi = (() => {
       else closeEdit(); // 絞り込みで見えなくなったときは閉じる
     }
     const total = data.rows.length;
+    const flagged = data.rows.filter(Box.needsCheck).length; // 辞書にない値などで、出力できない個体
+    g('box-flag').textContent = flagged ? `確認が必要な個体が${flagged}匹あります(オレンジ枠の行を押して直してください)。直すまで、CSVのコピー・保存(ファイル)はできません。` : '';
     g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : q ? `${total}匹のうち${items.length}匹を表示しています。` : `${total}匹`)
       + (data.broken ? ' 保存の中身の一部を読めなかったため、読めた分だけを出しています。' : '');
-    for (const id of ['box-copy', 'box-file', 'box-restore', 'box-clear']) g(id).disabled = total === 0;
+    for (const id of ['box-restore', 'box-clear']) g(id).disabled = total === 0;
+    for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
   }
 
   // ---- 1匹ずつ直す ----
@@ -111,6 +115,7 @@ const BoxUi = (() => {
     closeEdit();
     const p = Box.unpack(boxes[active - 1].rows[i]);
     const row = Object.assign(newRow(), p, { manualLevel: Number.isFinite(p.level) ? p.level : null, readSkill: p.skillLevel });
+    row.low = new Set(Box.lowKeys(row)); // 辞書にない値などの項目をオレンジ枠にする
     extraRows.set(row.id, row);
     editing = { idx: i, row };
     renderList();
@@ -150,6 +155,7 @@ const BoxUi = (() => {
     if (!enabled()) return;
     renderTabs();
     renderList();
+    g('box-import-note').textContent = `このアプリで出したCSVと、個体値計算機のボックスからエクスポートしたCSV・TSVを、「${nameOf(active)}」に追加します(いまの中身は消えません。1つのBOXは${Box.MAX}匹まで)。辞書にない値のある個体も入り、オレンジ枠で直せます。`;
   }
 
   // 確認などの欄。buttons: [{ label, cls, fn }]
@@ -236,6 +242,35 @@ const BoxUi = (() => {
     ]);
   }
 
+  // ---- CSV の読み込み(いま見ている BOX へ直接追加する) ----
+  function importInto(text) {
+    const n = active;
+    closeEdit();
+    const r = Import.parse(text);
+    const count = r.rows.length;
+    const data = boxes[n - 1];
+    const plan = Box.plan(count, boxes.map((b) => b.rows.length))[n - 1];
+    g('box-import-problems').innerHTML = r.problems.map((x) => `<li>${x.line ? `${x.line}行目: ` : ''}${esc(x.message)}</li>`).join('');
+    g('box-import-warn').textContent = '';
+    g('box-import-result').textContent = '';
+    if (!count) { g('box-import-result').textContent = '読み込めた個体はありませんでした。'; return; }
+    if (!plan.fits) {
+      // 入りきらないときは1匹も入れない(4の保存と同じ判定)
+      g('box-import-warn').textContent = `${nameOf(n)}にはあと${plan.room}匹しか入りません。${count}匹は入らないので、${nameOf(3 - n)}へ読み込むか、CSVの個体を減らしてください。`;
+      return;
+    }
+    const rows = data.rows.concat(r.rows.map(Box.pack));
+    if (!Box.save(n, { name: data.name, rows })) {
+      g('box-import-warn').textContent = '保存できませんでした。端末の空き容量や、ブラウザの設定を確かめてください。';
+      return;
+    }
+    boxes[n - 1] = Box.load(n);
+    const check = r.rows.filter((x) => Box.needsCheck(Box.pack(x))).length;
+    renderAll();
+    renderSave(okNow());
+    g('box-import-result').textContent = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(リストのオレンジ枠の行を押して直してください)。` : ''}`;
+  }
+
   function init() {
     for (const n of [1, 2]) g(`box-save-${n}`).addEventListener('click', () => save(n));
     g('box-guide').addEventListener('click', () => Install.guide());
@@ -245,6 +280,8 @@ const BoxUi = (() => {
       active = Number(t.dataset.tab);
       closeEdit();
       closeAsk();
+      for (const id of ['box-import-warn', 'box-import-result']) g(id).textContent = '';
+      g('box-import-problems').innerHTML = '';
       renderAll();
     });
     g('box-filter').addEventListener('input', renderList);
@@ -269,6 +306,19 @@ const BoxUi = (() => {
       const h = ev.target.closest('[data-open]');
       if (h && (ev.key === 'Enter' || ev.key === ' ') && ev.target === h) { ev.preventDefault(); h.click(); }
     });
+    g('box-import-open').addEventListener('click', () => {
+      const open = g('box-import-panel').hidden;
+      g('box-import-panel').hidden = !open;
+      g('box-import-open').setAttribute('aria-expanded', String(open));
+    });
+    g('box-import-file').addEventListener('change', async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      try { importInto(Import.decode(await file.arrayBuffer())); }
+      catch (e) { g('box-import-warn').textContent = `ファイルを読めませんでした: ${e.message}`; }
+    });
+    g('box-import-run').addEventListener('click', () => importInto(g('box-import-text').value));
     g('box-rename').addEventListener('click', rename);
     g('box-copy').addEventListener('click', copy);
     g('box-file').addEventListener('click', file);

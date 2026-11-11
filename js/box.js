@@ -58,7 +58,21 @@ const Box = (() => {
   // idx 番目の1匹だけを packed に替えた新しい配列を返す。並び順と件数は変えず、元の配列も変えない。範囲外なら何も変えない
   const replaceAt = (rows, idx, packed) => (Number.isInteger(idx) && idx >= 0 && idx < rows.length ? rows.map((r, i) => (i === idx ? packed : r)) : rows.slice());
 
+  // 3の4と同じ基準で出力できない個体(辞書にない値、レベルなし など)か。CSV から読み込んだ個体が当てはまることがある
+  const needsCheck = (packed) => Match.checkRow(unpack(packed)).errors.length > 0;
+  // 要確認の個体で、オレンジ枠を付ける項目(3の行の data-key)
+  const lowKeys = (row) => {
+    const keys = [];
+    if (!Match.find(row.species)) keys.push('species');
+    if (!Number.isInteger(row.level) || row.level < 1 || row.level > 100) keys.push('level');
+    if (row.nature && !NATURES.includes(row.nature)) keys.push('nature');
+    row.sub.forEach((s, i) => { if (s && !SUBSKILLS.includes(s)) keys.push(`sub${i}`); });
+    const own = Match.ingredientsOf(row.species);
+    if (own && row.ing.some((g) => g && !own.includes(g))) keys.push('ing');
+    return keys;
+  };
+
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, csv };
 })();

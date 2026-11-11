@@ -180,6 +180,7 @@ function loadRows(list) {
   const frag = document.createDocumentFragment();
   for (const p of list) {
     const row = Object.assign(newRow(), p, { manualLevel: Number.isFinite(p.level) ? p.level : null, readSkill: p.skillLevel });
+    row.low = new Set(Box.lowKeys(row));
     state.rows.push(row);
     const el = document.createElement('div');
     el.className = 'row';
@@ -190,38 +191,6 @@ function loadRows(list) {
   $('rows').append(frag);
   $('progress').textContent = '';
   refresh(); // 300匹でも1回だけ
-}
-
-// 読み込んだ個体(Import.parse の結果)を、3の一覧の末尾に足す。いまの一覧は消さない
-// 一括の指定(レベルなど)は上書きせず、読み込んだ値を使う。オレンジ枠と注意の文は、辞書にない値のあった行に付く
-function appendRows(list) {
-  Install.dismiss();
-  const frag = document.createDocumentFragment();
-  for (const p of list) {
-    const { low, notes, line, ...fields } = p;
-    const row = Object.assign(newRow(), fields, { manualLevel: Number.isFinite(p.level) ? p.level : null, readSkill: p.skillLevel, low: new Set(low), notes });
-    state.rows.push(row);
-    const el = document.createElement('div');
-    el.className = 'row';
-    el.dataset.id = row.id;
-    el.innerHTML = rowHtml(row);
-    frag.append(el);
-  }
-  $('rows').append(frag);
-  refresh(); // 300匹でも1回だけ
-}
-
-// CSV・TSV の文字を読み込む。結果を画面に出す
-function importText(text) {
-  const r = Import.parse(text);
-  if (r.rows.length) appendRows(r.rows);
-  const check = r.rows.filter((x) => x.low.length || x.notes.length).length;
-  $('import-result').textContent = r.rows.length
-    ? `${r.rows.length}匹を3の一覧に足しました。${check ? `うち${check}匹は、オレンジ枠の項目を確認してください。` : ''}`
-    : '読み込めた個体はありませんでした。';
-  $('import-problems').innerHTML = r.problems.map((x) => `<li>${x.line ? `${x.line}行目: ` : ''}${esc(x.message)}</li>`).join('');
-  if (r.rows.length) $('list-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  return r;
 }
 
 function renderRow(row) {
@@ -586,19 +555,6 @@ function init() {
     ev.target.value = '';
   });
   $('add').addEventListener('click', () => addRow(newRow()));
-  $('import-open').addEventListener('click', () => {
-    const open = $('import-panel').hidden;
-    $('import-panel').hidden = !open;
-    $('import-open').setAttribute('aria-expanded', String(open));
-  });
-  $('import-file').addEventListener('change', async (ev) => {
-    const file = ev.target.files[0];
-    ev.target.value = '';
-    if (!file) return;
-    try { importText(Import.decode(await file.arrayBuffer())); }
-    catch (e) { $('import-result').textContent = `ファイルを読めませんでした: ${e.message}`; $('import-problems').innerHTML = ''; }
-  });
-  $('import-run').addEventListener('click', () => importText($('import-text').value));
 
   const rows = $('rows');
   bindRowEvents(rows);

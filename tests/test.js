@@ -195,6 +195,30 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('何もなければ空', Box.load(n), { name: '', rows: [], broken: false });
 }
 
+// BOX への CSV の読み込み(個体は3を通さず、BOX へ直接足す)
+{
+  const sheet = [
+    'ニックネーム,ポケモン,レベル,食材1,食材2,食材3,せいかく,Lv10',
+    'しぐれ,カメックス,61,モーモーミルク,モーモーミルク,モーモーミルク,ひかえめ,おてつだいスピードM',
+    'もち,Bulbasaur,30,Honey,,,Jolly,ねむけ',
+    'こわれ,フシギダネ,,あまいミツ,,,ようき,',
+  ].join('\n');
+  const r = Import.parse(sheet);
+  const packed = r.rows.map(Box.pack);
+  eq('読み込んだ個体は BOX に入る形にできる(3匹)', packed.length, 3);
+  eq('正しい個体は要確認にならない', Box.needsCheck(packed[0]), false);
+  eq('辞書にない名前・性格・サブスキルの個体は要確認', Box.needsCheck(packed[1]), true);
+  eq('レベルがない個体も要確認', Box.needsCheck(packed[2]), true);
+  eq('オレンジ枠にする項目(辞書にない名前・性格・サブ)', Box.lowKeys(Box.unpack(packed[1])), ['species', 'nature', 'sub0']);
+  eq('オレンジ枠にする項目(レベルなし)', Box.lowKeys(Box.unpack(packed[2])), ['level']);
+  eq('正しい個体には枠を付けない', Box.lowKeys(Box.unpack(packed[0])), []);
+  eq('要確認の個体も保存して読み出せる', (() => { const n = 8; Box.save(n, { name: '', rows: packed }); const b = Box.load(n); localStorage.removeItem(Box.key(n)); return b.rows.map(Box.needsCheck); })(), [false, true, true]);
+  eq('要確認の個体を直すと(レベルを入れると)要確認でなくなる', Box.needsCheck(Box.pack({ ...Box.unpack(packed[2]), level: 40 })), false);
+  eq('250匹いるBOXに70匹の読み込みは入りきらない', Box.plan(70, [250, 0])[0], { fits: false, room: 50 });
+  eq('もう一方のBOXなら入る', Box.plan(70, [250, 0])[1].fits, true);
+  eq('ちょうど300匹になる読み込みは入る', Box.plan(50, [250, 0])[0].fits, true);
+}
+
 // CSV・TSV の読み込み
 {
   const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });

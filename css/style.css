@@ -313,6 +313,7 @@ button.danger { color: var(--error); border-color: var(--error); }
 .box-list { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .box-list li { position: relative; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
 .box-list li.open { border-color: var(--accent); }
+.box-list li.flag { border: 2px solid var(--low-line); }
 .box-list .bhead { cursor: pointer; padding-right: 44px; border-radius: 6px; }
 .box-list .bhead:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .box-list .bx { position: absolute; top: 8px; right: 10px; }
