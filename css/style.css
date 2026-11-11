@@ -334,7 +334,8 @@ button.danger { color: var(--error); border-color: var(--error); }
 .box-confirm { margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
 .box-confirm p { margin: 0 0 8px; }
 .box-danger { color: var(--error); }
-button[hidden] { display: none; }
+/* hidden 属性は、ほかの display 指定より優先して必ず隠す(.import-panel や .box-pager の display:flex に負けていた) */
+[hidden] { display: none !important; }
 .import-panel { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); display: flex; flex-direction: column; gap: 8px; }
 .import-panel .note { margin: 0; }
 .import-panel textarea { width: 100%; }
@@ -357,3 +358,5 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, s
 .box-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 6px 0; }
 .box-pager button { min-height: 38px; padding: 4px 14px; }
 .box-flag { display: block; width: 100%; text-align: left; margin: 6px 0 0; padding: 6px 10px; min-height: 0; border: 2px solid var(--low-line); color: var(--low-line); font-size: 0.9rem; line-height: 1.4; }
+
+#box-import-open[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }

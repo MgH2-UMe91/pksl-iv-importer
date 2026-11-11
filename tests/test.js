@@ -250,6 +250,7 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('要確認の印は各個体に付く', Box.view(mixed, {}).items.filter((x) => x.flag).map((x) => x.i), [3]);
 
   eq('クリップボードを読めなかったときは長押しで貼り付ける案内', Box.clipboardNotice(null), 'クリップボードを読めませんでした。下の欄に長押しで貼り付けてください。');
+  eq('読めなかった理由を添える', Box.clipboardNotice(null, 'NotAllowedError'), 'クリップボードを読めませんでした(NotAllowedError)。下の欄に長押しで貼り付けてください。');
   eq('クリップボードが空でも案内する', /空でした/.test(Box.clipboardNotice('  \n')), true);
   eq('クリップボードに中身があれば案内はない', Box.clipboardNotice('a,b'), '');
 }

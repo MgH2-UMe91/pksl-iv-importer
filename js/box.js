@@ -92,8 +92,9 @@ const Box = (() => {
 
   // クリップボードから読み込むとき、読めなかった・空だったときの案内。読めたなら ''
   // text が null なら読めなかった(許可されない・使えないブラウザ)
-  const clipboardNotice = (text) => (text === null
-    ? 'クリップボードを読めませんでした。下の欄に長押しで貼り付けてください。'
+  // reason: 読めなかった理由(NotAllowedError など)。小さく添える
+  const clipboardNotice = (text, reason = '') => (text === null
+    ? `クリップボードを読めませんでした${reason ? `(${reason})` : ''}。下の欄に長押しで貼り付けてください。`
     : !String(text).trim() ? 'クリップボードが空でした。CSVをコピーしてからもう一度押すか、下の欄に長押しで貼り付けてください。' : '');
 
   const csv = (rows) => Csv.build(rows.map(unpack));

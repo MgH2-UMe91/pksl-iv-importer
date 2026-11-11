@@ -283,7 +283,18 @@ const BoxUi = (() => {
     const check = r.rows.filter((x) => Box.needsCheck(Box.pack(x))).length;
     renderAll();
     renderSave(okNow());
-    g('box-import-result').textContent = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(リストのオレンジ枠の行を押して直してください)。` : ''}`;
+    g('box-import-problems').innerHTML = r.problems.length ? g('box-import-problems').innerHTML : '';
+    const done = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(リストのオレンジ枠の行を押して直してください)。` : ''}${r.problems.length ? ` 読めなかった行: ${r.problems.map((x) => `${x.line ? `${x.line}行目: ` : ''}${x.message}`).join(' ')}` : ''}`;
+    setImportOpen(false); // 成功したら閉じる
+    g('box-import-done').textContent = done;
+  }
+
+  // 読み込み欄を開く・閉じる。開いている間は、ボタンを押された見た目(▴)にする
+  function setImportOpen(open) {
+    g('box-import-panel').hidden = !open;
+    g('box-import-open').setAttribute('aria-expanded', String(open));
+    g('box-import-open').textContent = open ? 'CSVを読み込む ▴' : 'CSVを読み込む ▾';
+    if (open) g('box-import-done').textContent = '';
   }
 
   function init() {
@@ -297,7 +308,7 @@ const BoxUi = (() => {
       onlyFlag = false;
       closeEdit();
       closeAsk();
-      for (const id of ['box-import-warn', 'box-import-result']) g(id).textContent = '';
+      for (const id of ['box-import-warn', 'box-import-result', 'box-import-done']) g(id).textContent = '';
       g('box-import-problems').innerHTML = '';
       renderAll();
     });
@@ -336,11 +347,7 @@ const BoxUi = (() => {
       const h = ev.target.closest('[data-open]');
       if (h && (ev.key === 'Enter' || ev.key === ' ') && ev.target === h) { ev.preventDefault(); h.click(); }
     });
-    g('box-import-open').addEventListener('click', () => {
-      const open = g('box-import-panel').hidden;
-      g('box-import-panel').hidden = !open;
-      g('box-import-open').setAttribute('aria-expanded', String(open));
-    });
+    g('box-import-open').addEventListener('click', () => setImportOpen(g('box-import-panel').hidden));
     g('box-import-file').addEventListener('change', async (ev) => {
       const file = ev.target.files[0];
       ev.target.value = '';
@@ -350,13 +357,14 @@ const BoxUi = (() => {
     });
     g('box-import-run').addEventListener('click', () => importInto(g('box-import-text').value));
     g('box-import-clip').addEventListener('click', async () => {
-      let text = '';
-      try { text = await navigator.clipboard.readText(); } catch (e) { text = null; }
+      let text = '', reason = '';
+      // ボタンを押した処理のすぐ中で呼ぶ(間に別の非同期処理を挟むと、iOS は利用者の操作と見なさず断ることがある)
+      try { text = await navigator.clipboard.readText(); } catch (e) { text = null; reason = (e && e.name) || (navigator.clipboard ? '不明' : '使えないブラウザ'); }
       if (text === null || !text.trim()) {
         // 読めない・許可されない・空のとき: 貼り付け欄で長押しして貼り付けてもらう
         g('box-import-problems').innerHTML = '';
         g('box-import-result').textContent = '';
-        g('box-import-warn').textContent = Box.clipboardNotice(text);
+        g('box-import-warn').textContent = Box.clipboardNotice(text, reason);
         g('box-import-text').focus();
         return;
       }
