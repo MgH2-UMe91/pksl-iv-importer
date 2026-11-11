@@ -362,6 +362,7 @@ dialog.modal { border: 1px solid var(--line); border-radius: 12px; padding: 0; b
 dialog.modal::backdrop { background: rgba(0, 0, 0, 0.6); }
 .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .modal-body h3 { margin: 0; font-size: 1.1rem; }
+#box-import-title:focus { outline: none; } /* 開いたとき、キーボードが出ないよう見出しにフォーカスを置く(輪郭は出さない) */
 .modal-body .note { margin: 0; }
 .modal-body textarea { width: 100%; margin: 0; min-height: 160px; }
 .modal-body .box-warn { margin: 0; }

@@ -272,6 +272,8 @@ const BoxUi = (() => {
     document.documentElement.classList.add('modal-open'); // 後ろの画面がスクロールしないようにする
     if (typeof dlg().showModal === 'function') dlg().showModal(); // 後ろは暗くなり、押せなくなる
     else dlg().setAttribute('open', '');
+    // showModal は最初に操作できる要素(貼り付け欄)へ自動でフォーカスを当て、キーボードが出てしまう。見出しに置く
+    g('box-import-title').focus({ preventScroll: true });
   }
 
   function closeImport() {
