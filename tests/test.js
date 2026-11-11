@@ -88,7 +88,9 @@ eq('スキルレベルはCSVに入る', Csv.build([row({ skillLevel: 6 })]).spli
 
 // CSV
 eq('ヘッダーと1行', Csv.build([row({ sub: ['おてつだいボーナス', '', '', '', ''], shiny: true })]),
-  'nickname,Pokemon,level,skill level,ing 1,ing 2,ing 3,nature,Lv10,Lv25,Lv50,Lv70,Lv80,shiny\n,フシギダネ,60,,あまいミツ,あんみんトマト,ほっこりポテト,ようき,おてつだいボーナス,,,,,1\n');
+  'nickname,Pokemon,level,skill level,ing 1,ing 2,ing 3,nature,Lv10,Lv25,Lv50,Lv70,Lv80,shiny,mint,ribbon\n,フシギダネ,60,,あまいミツ,あんみんトマト,ほっこりポテト,ようき,おてつだいボーナス,,,,,1,0,0\n');
+eq('ミントと眠った時間はCSVの mint と ribbon に入る', Csv.build([row({ mint: true, ribbon: 1000 })]).split(/\n/)[1].split(',').slice(14), ['1', '1000']);
+eq('指定がなければ mint 0 と ribbon 0', Csv.build([row({})]).split(/\n/)[1].split(',').slice(14), ['0', '0']);
 eq('カンマ入りの名前', Csv.escape('a,b'), '"a,b"');
 eq('引用符入りの名前', Csv.escape('a"b'), '"a""b"');
 eq('改行は空白に', Csv.escape('a\nb'), 'a b');

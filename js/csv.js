@@ -2,7 +2,7 @@
 'use strict';
 
 const Csv = (() => {
-  const HEADER = ['nickname', 'Pokemon', 'level', 'skill level', 'ing 1', 'ing 2', 'ing 3', 'nature', 'Lv10', 'Lv25', 'Lv50', 'Lv70', 'Lv80', 'shiny'];
+  const HEADER = ['nickname', 'Pokemon', 'level', 'skill level', 'ing 1', 'ing 2', 'ing 3', 'nature', 'Lv10', 'Lv25', 'Lv50', 'Lv70', 'Lv80', 'shiny', 'mint', 'ribbon'];
 
   function escape(value) {
     // 取り込み側は1行ずつ読むので、改行は値の中に残さない
@@ -16,6 +16,7 @@ const Csv = (() => {
       row.ing[0], row.ing[1], row.ing[2], row.nature,
       ...row.sub,
       row.shiny ? 1 : 0,
+      row.mint ? 1 : 0, row.ribbon ?? 0,
     ].map(escape).join(',');
   }
 

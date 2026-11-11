@@ -5,13 +5,13 @@ const LEVELS = [30, 50, 60, 70, 80];
 const SKILL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8];
 const $ = (id) => document.getElementById(id);
 
-const state = { rows: [], bulkLevel: null, bulkSkill: null, bulkSeed: false, bulkSpecies: '', nextId: 1 }; // bulkLevel と bulkSkill が null なら読み取った値を使う
+const state = { rows: [], bulkLevel: null, bulkSkill: null, bulkSeed: false, bulkRibbon: null, bulkSpecies: '', nextId: 1 }; // bulkLevel と bulkSkill が null なら読み取った値を使う
 
 function newRow(image = null) {
   return {
     id: state.nextId++, image,
     nickname: '', species: '', level: NaN, readLevel: null, manualLevel: null, skillLevel: '', readSkill: '',
-    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, seed: false, base: null, picked: false,
+    ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, mint: false, ribbon: 0, seed: false, base: null, picked: false,
     low: new Set(), candidates: [], clues: null, icon: '', notes: [],
     shown: '',        // スクショに写っている種族。進化を選んでも変わらない(見本の保存と「進化する」の基準)
     pending: false,   // 「進化する」を入れたが、分岐があって進化先が決まっていない
@@ -55,6 +55,10 @@ function selectField(label, key, value, options, long = false) {
   const opts = ['', ...list].map((o) => `<option value="${esc(o)}"${o === value ? ' selected' : ''}>${esc(o) || '(なし)'}</option>`).join('');
   return `<label class="field${long ? ' long' : ''}" data-key="${key}"><span>${label}</span><select data-edit="${key}">${opts}</select></label>`;
 }
+
+// 一緒に眠った時間のリボン(時間)。0 はなし
+const RIBBONS = [0, 200, 500, 1000, 2000];
+const RIBBON_LABELS = { 0: '200時間未満', 200: '200〜500時間', 500: '500〜1000時間', 1000: '1000〜2000時間', 2000: '2000時間以上' }; // CSV には各段階の下限の時間(0/200/500/1000/2000)を入れる
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -132,6 +136,8 @@ function rowHtml(row) {
       <label class="field" data-key="skillLevel"><span>スキルレベル</span><input type="number" data-edit="skillLevel" min="1" max="8" value="${row.skillLevel}"></label>
       ${selectField('性格', 'nature', row.nature, NATURES)}
       <label class="check"><input type="checkbox" data-edit="shiny"${row.shiny ? ' checked' : ''}>色違い</label>
+      <label class="check"><input type="checkbox" data-edit="mint"${row.mint ? ' checked' : ''}>ミント使用</label>
+      <label class="field" data-key="ribbon"><span>一緒に眠った時間</span><select data-edit="ribbon">${RIBBONS.map((h) => `<option value="${h}"${h === row.ribbon ? ' selected' : ''}>${RIBBON_LABELS[h]}</option>`).join('')}</select></label>
       ${ingredientField(row, own)}
       ${row.sub.map((s, i) => selectField(`サブ${i + 1}`, `sub${i}`, s, SUBSKILLS, true)).join('')}
       <div class="foot">
@@ -148,6 +154,7 @@ function addRow(row) {
   row.level = levelOf(row);
   if (state.bulkSkill !== null) row.skillLevel = state.bulkSkill;
   if (state.bulkSeed) Match.setSeed(row, true);
+  if (state.bulkRibbon !== null) row.ribbon = state.bulkRibbon;
   state.rows.push(row);
   const el = document.createElement('div');
   el.className = 'row';
@@ -251,6 +258,9 @@ function refresh() {
   bulk.checked = has && state.rows.every((r) => r.seed);
   bulk.indeterminate = state.rows.some((r) => r.seed) && !bulk.checked;
 
+  const common = has && state.rows.every((r) => r.ribbon === state.rows[0].ribbon) ? state.rows[0].ribbon : null;
+  $('ribbon-all').value = common === null ? '' : String(common); // 行ごとに違うときは「1匹ずつ指定」を出す
+
   const ok = has && problems.length === 0;
   $('summary').textContent = ok ? `${state.rows.length}匹を出力できます。` : `${state.rows.length}匹のうち、直す項目が${problems.length}件あります。`;
   $('problems').innerHTML = problems.map((p) => `<li>${esc(p)}</li>`).join('');
@@ -277,6 +287,15 @@ function setSeedAll(on) {
   for (const row of state.rows) {
     Match.setSeed(row, on);
     $('rows').querySelector(`[data-id="${row.id}"]`).innerHTML = rowHtml(row); // 選択欄を変化後の値にする
+  }
+  refresh();
+}
+
+function setRibbonAll(hours) {
+  state.bulkRibbon = hours;
+  for (const row of state.rows) {
+    row.ribbon = hours;
+    $('rows').querySelector(`[data-id="${row.id}"] [data-edit="ribbon"]`).value = hours;
   }
   refresh();
 }
@@ -384,6 +403,8 @@ function onEdit(ev) {
   }
   else if (key === 'skillLevel') row.skillLevel = t.value === '' ? '' : Number(t.value);
   else if (key === 'shiny') row.shiny = t.checked;
+  else if (key === 'mint') row.mint = t.checked;
+  else if (key === 'ribbon') row.ribbon = Number(t.value);
   else if (key === 'seed') { Match.setSeed(row, t.checked); renderRow(row); return; }
   else if (/^ing\d$/.test(key)) row.ing[key[3]] = t.value;
   else if (/^sub\d$/.test(key)) Match.editSub(row, Number(key[3]), t.value);
@@ -423,6 +444,8 @@ function init() {
   }
 
   $('seed-all').addEventListener('change', (ev) => setSeedAll(ev.target.checked));
+  $('ribbon-all').innerHTML = `<option value="" disabled hidden>(1匹ずつ指定)</option>` + RIBBONS.map((h) => `<option value="${h}">${RIBBON_LABELS[h]}</option>`).join('');
+  $('ribbon-all').addEventListener('change', (ev) => setRibbonAll(Number(ev.target.value)));
 
   // 種族が決まっていない個体の一括選択
   $('unresolved-list').addEventListener('change', (ev) => {
