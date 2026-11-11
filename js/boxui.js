@@ -169,7 +169,6 @@ const BoxUi = (() => {
     if (!enabled()) return;
     renderTabs();
     renderList();
-    g('box-import-note').textContent = `このアプリで出したCSVと、個体値計算機のボックスからエクスポートしたCSV・TSVを、「${nameOf(active)}」に追加します(いまの中身は消えません。1つのBOXは${Box.MAX}匹まで)。辞書にない値のある個体も入り、オレンジ枠で直せます。`;
   }
 
   // 確認などの欄。buttons: [{ label, cls, fn }]
@@ -256,18 +255,48 @@ const BoxUi = (() => {
     ]);
   }
 
-  // ---- CSV の読み込み(いま見ている BOX へ直接追加する) ----
+  // ---- CSV の読み込み(いま見ている BOX へ直接追加する。ダイアログで貼り付ける) ----
+  const dlg = () => g('box-import-dialog');
+  const clearImportMessages = () => {
+    for (const id of ['box-import-warn', 'box-import-result']) g(id).textContent = '';
+    g('box-import-problems').innerHTML = '';
+  };
+
+  function openImport() {
+    closeEdit();
+    closeAsk();
+    g('box-import-title').textContent = `${nameOf(active)}にインポート`;
+    g('box-import-text').value = '';
+    g('box-import-method').value = 'paste';
+    clearImportMessages();
+    g('box-import-done').textContent = '';
+    document.documentElement.classList.add('modal-open'); // 後ろの画面がスクロールしないようにする
+    if (typeof dlg().showModal === 'function') dlg().showModal(); // 後ろは暗くなり、押せなくなる
+    else dlg().setAttribute('open', '');
+  }
+
+  function closeImport() {
+    if (typeof dlg().close === 'function') dlg().close(); else dlg().removeAttribute('open');
+    afterImportClosed();
+  }
+
+  // 閉じたら貼り付け欄は空にして、後ろのスクロールを戻す(閉じるボタン・背景・Esc のどれでも通る)
+  function afterImportClosed() {
+    document.documentElement.classList.remove('modal-open');
+    g('box-import-text').value = '';
+    clearImportMessages();
+  }
+
   function importInto(text) {
     const n = active;
-    closeEdit();
     const r = Import.parse(text);
     const count = r.rows.length;
     const data = boxes[n - 1];
     const plan = Box.plan(count, boxes.map((b) => b.rows.length))[n - 1];
+    clearImportMessages();
     g('box-import-problems').innerHTML = r.problems.map((x) => `<li>${x.line ? `${x.line}行目: ` : ''}${esc(x.message)}</li>`).join('');
-    g('box-import-warn').textContent = '';
-    g('box-import-result').textContent = '';
-    if (!count) { g('box-import-result').textContent = '読み込めた個体はありませんでした。'; return; } // 貼り付け欄は残す(直して読み直せる)
+    // 1匹も入らないとき(全行エラー・上限超え)は閉じず、貼り付け欄の中身も残す(直して読み直せる)
+    if (!count) { g('box-import-result').textContent = '読み込めた個体はありませんでした。'; return; }
     if (!plan.fits) {
       // 入りきらないときは1匹も入れない(4の保存と同じ判定)
       g('box-import-warn').textContent = `${nameOf(n)}にはあと${plan.room}匹しか入りません。${count}匹は入らないので、${nameOf(3 - n)}へ読み込むか、CSVの個体を減らしてください。`;
@@ -279,22 +308,13 @@ const BoxUi = (() => {
       return;
     }
     boxes[n - 1] = Box.load(n);
-    g('box-import-text').value = ''; // 読み込めたら貼り付け欄を空にする
     const check = r.rows.filter((x) => Box.needsCheck(Box.pack(x))).length;
+    const done = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(オレンジ枠の行を押して直してください)。` : ''}${r.problems.length ? ` 読めなかった行: ${r.problems.map((x) => `${x.line ? `${x.line}行目: ` : ''}${x.message}`).join(' ')}` : ''}`;
+    closeImport(); // 成功したら閉じる(貼り付け欄も空になる)
+    page = 0; onlyFlag = false;
     renderAll();
     renderSave(okNow());
-    g('box-import-problems').innerHTML = r.problems.length ? g('box-import-problems').innerHTML : '';
-    const done = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(リストのオレンジ枠の行を押して直してください)。` : ''}${r.problems.length ? ` 読めなかった行: ${r.problems.map((x) => `${x.line ? `${x.line}行目: ` : ''}${x.message}`).join(' ')}` : ''}`;
-    setImportOpen(false); // 成功したら閉じる
-    g('box-import-done').textContent = done;
-  }
-
-  // 読み込み欄を開く・閉じる。開いている間は、ボタンを押された見た目(▴)にする
-  function setImportOpen(open) {
-    g('box-import-panel').hidden = !open;
-    g('box-import-open').setAttribute('aria-expanded', String(open));
-    g('box-import-open').textContent = open ? 'CSVを読み込む ▴' : 'CSVを読み込む ▾';
-    if (open) g('box-import-done').textContent = '';
+    g('box-import-done').textContent = done; // 結果は5のリストの上に出す
   }
 
   function init() {
@@ -308,8 +328,7 @@ const BoxUi = (() => {
       onlyFlag = false;
       closeEdit();
       closeAsk();
-      for (const id of ['box-import-warn', 'box-import-result', 'box-import-done']) g(id).textContent = '';
-      g('box-import-problems').innerHTML = '';
+      g('box-import-done').textContent = '';
       renderAll();
     });
     g('box-ing').innerHTML = '<option value="">食材: すべて</option>' + INGREDIENTS.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
@@ -347,28 +366,41 @@ const BoxUi = (() => {
       const h = ev.target.closest('[data-open]');
       if (h && (ev.key === 'Enter' || ev.key === ' ') && ev.target === h) { ev.preventDefault(); h.click(); }
     });
-    g('box-import-open').addEventListener('click', () => setImportOpen(g('box-import-panel').hidden));
+    g('box-import-open').addEventListener('click', openImport);
+    g('box-import-close').addEventListener('click', closeImport);
+    g('box-import-run').addEventListener('click', () => importInto(g('box-import-text').value));
+    g('box-import-clip').addEventListener('click', async () => {
+      let text = '', reason = '';
+      // ボタンを押した処理の最初の await で呼ぶ(間に別の非同期処理を挟むと、iOS は利用者の操作と見なさず断ることがある)
+      try { text = await navigator.clipboard.readText(); } catch (e) { text = null; reason = (e && e.name) || (navigator.clipboard ? '不明' : '使えないブラウザ'); }
+      if (text === null || !text.trim()) {
+        // 読めない・許可されない・空のとき: 閉じずに、貼り付け欄へ案内する(中身は残す)
+        clearImportMessages();
+        g('box-import-warn').textContent = Box.clipboardNotice(text, reason);
+        return;
+      }
+      g('box-import-text').value = text; // 読めた内容を貼り付け欄に入れて、そのままインポートする(失敗したときは中身が残り、直せる)
+      importInto(text);
+    });
+    // 暗い背景(ダイアログの外)を押したら閉じる。Esc で閉じたときも、後片付けをする
+    dlg().addEventListener('click', (ev) => { if (ev.target === dlg()) closeImport(); });
+    dlg().addEventListener('close', afterImportClosed);
+    dlg().addEventListener('cancel', afterImportClosed); // Esc は cancel のあとに close になる。どちらでも片付ける
+    // 「ファイル」を選ぶとファイル選択を開き、選んだ内容を貼り付け欄に入れる(そのまま入れずに、確かめてから「インポート」)
+    g('box-import-method').addEventListener('change', (ev) => {
+      if (ev.target.value !== 'file') return;
+      ev.target.value = 'paste';
+      g('box-import-file').click();
+    });
     g('box-import-file').addEventListener('change', async (ev) => {
       const file = ev.target.files[0];
       ev.target.value = '';
       if (!file) return;
-      try { importInto(Import.decode(await file.arrayBuffer())); }
-      catch (e) { g('box-import-warn').textContent = `ファイルを読めませんでした: ${e.message}`; }
-    });
-    g('box-import-run').addEventListener('click', () => importInto(g('box-import-text').value));
-    g('box-import-clip').addEventListener('click', async () => {
-      let text = '', reason = '';
-      // ボタンを押した処理のすぐ中で呼ぶ(間に別の非同期処理を挟むと、iOS は利用者の操作と見なさず断ることがある)
-      try { text = await navigator.clipboard.readText(); } catch (e) { text = null; reason = (e && e.name) || (navigator.clipboard ? '不明' : '使えないブラウザ'); }
-      if (text === null || !text.trim()) {
-        // 読めない・許可されない・空のとき: 貼り付け欄で長押しして貼り付けてもらう
-        g('box-import-problems').innerHTML = '';
-        g('box-import-result').textContent = '';
-        g('box-import-warn').textContent = Box.clipboardNotice(text, reason);
-        g('box-import-text').focus();
-        return;
-      }
-      importInto(text);
+      clearImportMessages();
+      try {
+        g('box-import-text').value = Import.decode(await file.arrayBuffer());
+        g('box-import-result').textContent = `ファイル「${file.name}」の内容を貼り付け欄に入れました。確かめて「インポート」を押してください。`;
+      } catch (e) { g('box-import-warn').textContent = `ファイルを読めませんでした: ${e.message}`; }
     });
     g('box-rename').addEventListener('click', rename);
     g('box-copy').addEventListener('click', copy);

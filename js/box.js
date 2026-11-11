@@ -90,12 +90,11 @@ const Box = (() => {
     return { items: items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), count: items.length, pages, page, flagged };
   }
 
-  // クリップボードから読み込むとき、読めなかった・空だったときの案内。読めたなら ''
-  // text が null なら読めなかった(許可されない・使えないブラウザ)
-  // reason: 読めなかった理由(NotAllowedError など)。小さく添える
+  // クリップボードから読めなかった・空だったときの案内。読めたなら ''
+  // text が null なら読めなかった(許可されない・使えないブラウザ)。reason は NotAllowedError などの名前
   const clipboardNotice = (text, reason = '') => (text === null
-    ? `クリップボードを読めませんでした${reason ? `(${reason})` : ''}。下の欄に長押しで貼り付けてください。`
-    : !String(text).trim() ? 'クリップボードが空でした。CSVをコピーしてからもう一度押すか、下の欄に長押しで貼り付けてください。' : '');
+    ? `クリップボードを読めませんでした${reason ? `(${reason})` : ''}。上の欄に長押しで貼り付けて「インポート」を押してください。`
+    : !String(text).trim() ? 'クリップボードが空でした。CSVをコピーしてからもう一度押すか、上の欄に長押しで貼り付けて「インポート」を押してください。' : '');
 
   const csv = (rows) => Csv.build(rows.map(unpack));
 

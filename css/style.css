@@ -336,9 +336,6 @@ button.danger { color: var(--error); border-color: var(--error); }
 .box-danger { color: var(--error); }
 /* hidden 属性は、ほかの display 指定より優先して必ず隠す(.import-panel や .box-pager の display:flex に負けていた) */
 [hidden] { display: none !important; }
-.import-panel { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); display: flex; flex-direction: column; gap: 8px; }
-.import-panel .note { margin: 0; }
-.import-panel textarea { width: 100%; }
 .import-problems { margin: 0; padding-left: 1.2em; color: var(--low-line); font-size: 0.9rem; }
 .import-problems:empty { display: none; }
 
@@ -359,4 +356,18 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, s
 .box-pager button { min-height: 38px; padding: 4px 14px; }
 .box-flag { display: block; width: 100%; text-align: left; margin: 6px 0 0; padding: 6px 10px; min-height: 0; border: 2px solid var(--low-line); color: var(--low-line); font-size: 0.9rem; line-height: 1.4; }
 
-#box-import-open[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+
+/* BOX へのインポートのダイアログ(画面の中央に出し、後ろを暗くする) */
+dialog.modal { border: 1px solid var(--line); border-radius: 12px; padding: 0; background: var(--card); color: var(--text); width: min(92vw, 520px); max-height: 90vh; overflow: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+dialog.modal::backdrop { background: rgba(0, 0, 0, 0.6); }
+.modal-body { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.modal-body h3 { margin: 0; font-size: 1.1rem; }
+.modal-body .note { margin: 0; }
+.modal-body textarea { width: 100%; margin: 0; min-height: 160px; }
+.modal-body .box-warn { margin: 0; }
+.modal-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.modal-actions #box-import-clip { margin-right: auto; }
+@media (max-width: 520px) { .modal-actions #box-import-clip { flex: 1 1 100%; margin-right: 0; } } /* 狭い画面では、クリップボードのボタンを上の段に回す */
+html.modal-open, html.modal-open body, html.modal-open .app { overflow: hidden; }
+.box-done { margin: 6px 0 0; padding: 6px 10px; border-left: 3px solid var(--accent); font-size: 0.9rem; line-height: 1.5; }
+.box-done:empty { display: none; }

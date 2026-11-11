@@ -105,6 +105,7 @@
       </select>
     </div>
     <p id="box-count" class="note" role="status"></p>
+    <p id="box-import-done" class="box-done" role="status"></p>
     <button id="box-flag" type="button" class="box-flag" hidden></button>
     <div id="box-pager-top" class="box-pager" hidden></div>
     <ul id="box-list" class="box-list"></ul>
@@ -113,21 +114,10 @@
       <button id="box-rename" type="button">名前を変える</button>
       <button id="box-copy" type="button">CSVをコピー</button>
       <button id="box-file" type="button">保存(ファイル)</button>
-      <button id="box-import-open" type="button" aria-expanded="false" aria-controls="box-import-panel">CSVを読み込む ▾</button>
+      <button id="box-import-open" type="button" aria-haspopup="dialog">CSVを読み込む</button>
       <button id="box-restore" type="button">3へ戻して編集</button>
       <button id="box-clear" type="button" class="danger">BOXを空にする</button>
     </div>
-    <div id="box-import-panel" class="import-panel" hidden>
-      <p id="box-import-note" class="note"></p>
-      <div class="actions"><button id="box-import-clip" type="button" class="primary">クリップボードから読み込む</button></div>
-      <div class="actions"><label class="button">ファイルを選ぶ<input id="box-import-file" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden></label></div>
-      <label class="field"><span>または、ここに貼り付けて読み込む</span><textarea id="box-import-text" rows="4" placeholder="1行目が列名のCSVを貼り付けてください" autocomplete="off"></textarea></label>
-      <div class="actions"><button id="box-import-run" type="button" class="primary">貼り付けた内容を読み込む</button></div>
-      <p id="box-import-warn" class="box-warn" role="status"></p>
-      <p id="box-import-result" class="note" role="status"></p>
-      <ul id="box-import-problems" class="import-problems"></ul>
-    </div>
-    <p id="box-import-done" class="note" role="status"></p>
     <div id="box-confirm" class="box-confirm" hidden></div>
     <p class="note">※BOXはこの端末のこのアプリの中だけに保存されます。アプリを消すと中身も消えるので、大事なBOXはCSVで保存してください。</p>
   </section>
@@ -136,6 +126,29 @@
   <p>制作者: ゆめくい(X: <a href="https://x.com/youmay91" target="_blank" rel="noopener noreferrer">@youmay91</a>)</p>
 </footer>
 </div>
+
+<dialog id="box-import-dialog" class="modal" aria-labelledby="box-import-title">
+  <div class="modal-body">
+    <h3 id="box-import-title">インポート</h3>
+    <p class="note">このアプリや個体値計算機からエクスポートしたCSV・TSVを貼り付けて、「インポート」を押してください。1行目の列名は必須です。</p>
+    <label class="field"><span>インポート方法</span>
+      <select id="box-import-method" aria-label="インポート方法">
+        <option value="paste">貼り付け</option>
+        <option value="file">ファイル</option>
+      </select>
+    </label>
+    <input id="box-import-file" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden>
+    <textarea id="box-import-text" rows="9" placeholder="ここに長押しで貼り付けてください(1行目が列名のCSV)" autocomplete="off" aria-label="貼り付け欄"></textarea>
+    <p id="box-import-warn" class="box-warn" role="status"></p>
+    <p id="box-import-result" class="note" role="status"></p>
+    <ul id="box-import-problems" class="import-problems"></ul>
+    <div class="modal-actions">
+      <button id="box-import-clip" type="button">クリップボードからインポート</button>
+      <button id="box-import-run" type="button" class="primary">インポート</button>
+      <button id="box-import-close" type="button">閉じる</button>
+    </div>
+  </div>
+</dialog>
 
 <script src="data/pokemon.js"></script>
 <script src="data/dict.js"></script>

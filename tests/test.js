@@ -247,12 +247,11 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('要確認の数はBOX全体で数える', Box.view(mixed, { query: 'n4' }).flagged, 2);
   eq('要確認だけに絞り込める', Box.view(mixed, { onlyFlag: true }).items.map((x) => x.i), [3, 40]);
   eq('要確認だけでも名前で重ねて絞り込める', Box.view(mixed, { onlyFlag: true, query: 'n40' }).items.map((x) => x.i), [40]);
-  eq('要確認の印は各個体に付く', Box.view(mixed, {}).items.filter((x) => x.flag).map((x) => x.i), [3]);
-
-  eq('クリップボードを読めなかったときは長押しで貼り付ける案内', Box.clipboardNotice(null), 'クリップボードを読めませんでした。下の欄に長押しで貼り付けてください。');
-  eq('読めなかった理由を添える', Box.clipboardNotice(null, 'NotAllowedError'), 'クリップボードを読めませんでした(NotAllowedError)。下の欄に長押しで貼り付けてください。');
+  eq('クリップボードを読めなかったときは、理由つきで貼り付けの案内を出す', Box.clipboardNotice(null, 'NotAllowedError'), 'クリップボードを読めませんでした(NotAllowedError)。上の欄に長押しで貼り付けて「インポート」を押してください。');
+  eq('理由が分からなくても案内する', /^クリップボードを読めませんでした。/.test(Box.clipboardNotice(null)), true);
   eq('クリップボードが空でも案内する', /空でした/.test(Box.clipboardNotice('  \n')), true);
   eq('クリップボードに中身があれば案内はない', Box.clipboardNotice('a,b'), '');
+  eq('要確認の印は各個体に付く', Box.view(mixed, {}).items.filter((x) => x.flag).map((x) => x.i), [3]);
 }
 
 // CSV・TSV の読み込み
