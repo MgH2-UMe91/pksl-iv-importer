@@ -395,8 +395,8 @@ html.modal-open, html.modal-open body, html.modal-open .app { overflow: hidden; 
 .box-done:empty { display: none; }
 
 /* ====== 画面の作り直し: 帯・タブ・BOX タブ・編集画面 ====== */
-.bar { position: relative; max-width: 860px; margin: 0 auto; padding: 6px 8px 6px 16px; background: var(--accent); color: var(--accent-text); display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; }
-.bar h1 { margin: 0; font-size: 1.2rem; text-align: center; }
+.bar { position: relative; max-width: 860px; margin: 0 auto; padding: 6px 8px 6px 16px; background: var(--accent); color: var(--accent-text); display: grid; grid-template-columns: 1fr 44px; align-items: center; }
+.bar h1 { margin: 0; font-size: 1.2rem; text-align: left; }
 .bar #app-menu-btn { min-height: 44px; width: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 1.4rem; line-height: 1; }
 .bar-menu { top: calc(100% - 2px); right: 8px; min-width: 200px; color: var(--text); }
 .bar-menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 2px 0; }
