@@ -72,7 +72,7 @@ const Box = (() => {
     return keys;
   };
 
-  const PAGE_SIZE = 30;
+  const PAGE_SIZE = 40; // 4列の箱の、4の倍数
   // 5 のリストに出す個体を決める。opts: { query, ingredient, onlyFlag, sort, page(0始まり) }
   // 返す値: { items: [{ a, i, flag }](このページ), count(絞り込み後の匹数), pages, page, flagged(BOX全体の要確認の数) }
   function view(rows, opts = {}) {
@@ -87,7 +87,7 @@ const Box = (() => {
     else if (opts.sort === 'level') items.sort((x, y) => (y.a[2] ?? 0) - (x.a[2] ?? 0) || x.i - y.i);
     const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
     const page = Math.min(Math.max(0, opts.page ?? 0), pages - 1);
-    return { items: items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), count: items.length, pages, page, flagged };
+    return { items: items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), order: items.map((x) => x.i), count: items.length, pages, page, flagged };
   }
 
   // クリップボードから読めなかった・空だったときの案内。読めたなら ''
@@ -96,7 +96,33 @@ const Box = (() => {
     ? `クリップボードを読めませんでした${reason ? `(${reason})` : ''}。上の欄に長押しで貼り付けて「インポート」を押してください。`
     : !String(text).trim() ? 'クリップボードが空でした。CSVをコピーしてからもう一度押すか、上の欄に長押しで貼り付けて「インポート」を押してください。' : '');
 
+  // 編集画面の ‹ › で移る先。order は今の並び・絞り込みの個体の番号(全ページ分)。端なら null
+  const neighbor = (order, idx, delta) => {
+    const p = order.indexOf(idx), q = p + delta;
+    return p < 0 || q < 0 || q >= order.length ? null : order[q];
+  };
+  // その個体が何ページ目(0始まり)にあるか。編集画面を閉じたとき、その個体のページに戻る
+  const pageOf = (order, idx) => { const p = order.indexOf(idx); return p < 0 ? 0 : Math.floor(p / PAGE_SIZE); };
+  const removeAt = (rows, idx) => rows.filter((_, i) => i !== idx);
+
+  // 性格の補正。[上がる項目, 下がる項目]。補正のない5つ(がんばりや・すなお・てれや・きまぐれ・まじめ)は含めない
+  // 出どころ: ユーザーが出した一覧表(行が上がる項目、列が下がる項目。対角が補正なし)
+  const SPEED = 'おてつだいスピード', ING = '食材おてつだい確率', SKILL = 'メインスキル発生確率', EXP = 'EXP獲得量', ENERGY = 'げんき回復量';
+  const NATURE_FX = {
+    'さみしがり': [SPEED, ENERGY], 'いじっぱり': [SPEED, ING], 'やんちゃ': [SPEED, SKILL], 'ゆうかん': [SPEED, EXP],
+    'ずぶとい': [ENERGY, SPEED], 'わんぱく': [ENERGY, ING], 'のうてんき': [ENERGY, SKILL], 'のんき': [ENERGY, EXP],
+    'ひかえめ': [ING, SPEED], 'おっとり': [ING, ENERGY], 'うっかりや': [ING, SKILL], 'れいせい': [ING, EXP],
+    'おだやか': [SKILL, SPEED], 'おとなしい': [SKILL, ENERGY], 'しんちょう': [SKILL, ING], 'なまいき': [SKILL, EXP],
+    'おくびょう': [EXP, SPEED], 'せっかち': [EXP, ENERGY], 'ようき': [EXP, ING], 'むじゃき': [EXP, SKILL],
+  };
+  const natureEffect = (name) => (NATURE_FX[name] ? { up: NATURE_FX[name][0], down: NATURE_FX[name][1] } : null);
+
+  // 上のタブ(取込み / BOX)を覚える。使えない環境では、いつも取込みから始まる
+  const TAB_KEY = 'iv-importer-tab';
+  const loadTab = () => { try { const t = localStorage.getItem(TAB_KEY); return t === 'box' ? 'box' : 'import'; } catch (e) { return 'import'; } };
+  const saveTab = (t) => { try { localStorage.setItem(TAB_KEY, t === 'box' ? 'box' : 'import'); } catch (e) { /* 覚えられなくても動く */ } };
+
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, PAGE_SIZE, clipboardNotice, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, PAGE_SIZE, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
 })();

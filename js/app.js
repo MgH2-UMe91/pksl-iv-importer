@@ -194,7 +194,7 @@ function loadRows(list) {
 }
 
 function renderRow(row) {
-  rowEl(row).innerHTML = rowHtml(row, extraRows.has(row.id));
+  rowEl(row).innerHTML = extraRows.has(row.id) && typeof BoxUi !== 'undefined' ? BoxUi.sheetHtml(row) : rowHtml(row);
   touch(row);
 }
 
@@ -600,6 +600,7 @@ function init() {
 
 init();
 BoxUi.init();
+AppMenu.init();
 Install.init(() => state.rows.length > 0 || !!$('progress').textContent.startsWith('読み取り中'));
 
 // オフライン対応。使えない環境でもそのまま動く

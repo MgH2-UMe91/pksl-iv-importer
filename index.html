@@ -12,16 +12,35 @@
 <link rel="icon" href="icons/icon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
+<script>
+// 見た目の設定(自動・ライト・ダーク)を、画面が描かれる前に当てる(ちらつき防止)。js/theme.js と同じキー
+try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="app">
-<header>
-  <h1>スクショ取り込みツール for 個体値計算機</h1>
-  <p>ポケモンスリープの詳細画面のスクショから、個体値計算機のボックスへ取り込める CSV を作ります。画像は端末の外へ送りません。非公式のファンツールです。</p>
+<header class="bar">
+  <span class="bar-gap" aria-hidden="true"></span>
+  <h1>スクショ取込みツール</h1>
+  <button id="app-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="メニュー">⋮</button>
+  <div id="app-menu" class="pop-menu bar-menu" role="menu" hidden>
+    <div class="menu-head" role="presentation">見た目</div>
+    <button id="theme-auto" type="button" role="menuitemradio" aria-checked="true">✓ 自動</button>
+    <button id="theme-light" type="button" role="menuitemradio" aria-checked="false">　ライト</button>
+    <button id="theme-dark" type="button" role="menuitemradio" aria-checked="false">　ダーク</button>
+    <hr>
+    <button id="install-open" type="button" role="menuitem">ホーム画面に追加</button>
+    <button id="about-open" type="button" role="menuitem">このアプリについて</button>
+  </div>
 </header>
+<nav class="tabs" role="tablist" aria-label="画面の切り替え">
+  <button id="tab-import" type="button" role="tab" aria-selected="true" aria-controls="pane-import">取込み</button>
+  <button id="tab-box" type="button" role="tab" aria-selected="false" aria-controls="pane-box">BOX</button>
+</nav>
 
 <main>
+<div id="pane-import" role="tabpanel" aria-labelledby="tab-import">
   <section>
     <h2>1. スクショを選ぶ</h2>
     <div class="actions">
@@ -91,41 +110,81 @@
       <textarea id="preview" rows="8" readonly></textarea>
     </details>
   </section>
-  <section id="box-section" hidden>
-    <h2>5. BOX</h2>
+</div>
+
+<div id="pane-box" role="tabpanel" aria-labelledby="tab-box" hidden>
+  <section id="box-browser-note2" hidden>
+    <h2>BOX</h2>
+    <p class="note">BOXはホーム画面に追加したアプリでだけ使えます。ブラウザの保存は、しばらく開かないと消えることがあるためです。<button id="box-guide2" type="button" class="linklike">追加のしかた</button></p>
+  </section>
+  <section id="box-app" hidden>
     <div class="box-tabs" id="box-tabs" role="tablist"></div>
     <div class="box-tools">
-      <input id="box-filter" type="search" placeholder="名前・ニックネームで絞り込む" autocomplete="off" aria-label="名前・ニックネームで絞り込む">
+      <input id="box-filter" type="search" placeholder="名前で絞込" autocomplete="off" aria-label="名前・ニックネームで絞り込む">
       <select id="box-ing" aria-label="食材で絞り込む"></select>
       <select id="box-sort" aria-label="並べ替え">
         <option value="added">追加順</option>
         <option value="newest">新しい順</option>
         <option value="species">種族名順</option>
-        <option value="level">レベルの高い順</option>
+        <option value="level">レベル順</option>
       </select>
     </div>
     <p id="box-count" class="note" role="status"></p>
     <p id="box-import-done" class="box-done" role="status"></p>
     <button id="box-flag" type="button" class="box-flag" hidden></button>
     <div id="box-pager-top" class="box-pager" hidden></div>
-    <ul id="box-list" class="box-list"></ul>
+    <div class="box-grid-wrap" id="box-grid-wrap">
+      <div id="box-grid" class="box-grid"></div>
+      <div id="box-cell-menu" class="pop-menu" role="menu" hidden>
+        <button type="button" role="menuitem" id="cell-edit">✎ 編集</button>
+        <button type="button" role="menuitem" id="cell-delete" class="danger-text">⊖ 削除</button>
+      </div>
+    </div>
     <div id="box-pager-bottom" class="box-pager" hidden></div>
-    <div class="actions box-actions">
-      <button id="box-rename" type="button">名前を変える</button>
-      <button id="box-copy" type="button">CSVをコピー</button>
-      <button id="box-file" type="button">保存(ファイル)</button>
+    <div class="box-actions">
       <button id="box-import-open" type="button" aria-haspopup="dialog">CSVを読み込む</button>
-      <button id="box-restore" type="button">3へ戻して編集</button>
-      <button id="box-clear" type="button" class="danger">BOXを空にする</button>
+      <button id="box-copy" type="button">CSVをコピー</button>
+      <button id="box-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="そのほかの操作">⋯</button>
+    </div>
+    <div id="box-more" class="pop-menu more-menu" role="menu" hidden>
+      <button id="box-rename" type="button" role="menuitem">名前を変える</button>
+      <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
+      <button id="box-restore" type="button" role="menuitem">3へ戻して編集</button>
+      <button id="box-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
     </div>
     <div id="box-confirm" class="box-confirm" hidden></div>
     <p class="note">※BOXはこの端末のこのアプリの中だけに保存されます。アプリを消すと中身も消えるので、大事なBOXはCSVで保存してください。</p>
   </section>
+</div>
 </main>
 <footer class="credit">
   <p>制作者: ゆめくい(X: <a href="https://x.com/youmay91" target="_blank" rel="noopener noreferrer">@youmay91</a>)</p>
 </footer>
 </div>
+
+<dialog id="box-sheet" class="sheet" aria-label="個体の編集">
+  <div class="sheet-scroll"><div class="row sheet-row" id="box-sheet-row"></div></div>
+  <div class="sheet-nav">
+    <button id="sheet-prev" type="button" aria-label="前の個体">‹</button>
+    <button id="sheet-close" type="button" aria-label="閉じる" autofocus>✕</button>
+    <button id="sheet-next" type="button" aria-label="次の個体">›</button>
+  </div>
+</dialog>
+
+<dialog id="about-dialog" class="modal" aria-labelledby="about-title">
+  <div class="modal-body">
+    <h3 id="about-title" tabindex="-1">このアプリについて</h3>
+    <p>ポケモンスリープの詳細画面のスクショから、個体値計算機のボックスへ取り込める CSV を作ります。</p>
+    <ul class="about-list">
+      <li>画像は端末の外へ送りません。文字の認識は、端末のブラウザの中で行います。</li>
+      <li>非公式のファンツールです。株式会社ポケモン、任天堂、個体値計算機の作者とは関係ありません。</li>
+      <li>制作者: ゆめくい(X: <a href="https://x.com/youmay91" target="_blank" rel="noopener noreferrer">@youmay91</a>)</li>
+      <li>うまく読み取れなかった時は、加工していないスクショを4枚ほど<a href="https://x.com/youmay91" target="_blank" rel="noopener noreferrer">制作者のX</a>へ送ってください。</li>
+    </ul>
+    <p class="note">バージョン: <span id="about-version">…</span></p>
+    <div class="modal-actions"><button id="about-close" type="button" class="primary">閉じる</button></div>
+  </div>
+</dialog>
 
 <dialog id="box-import-dialog" class="modal" aria-labelledby="box-import-title">
   <div class="modal-body">
@@ -151,6 +210,8 @@
 <script src="js/match.js"></script>
 <script src="js/csv.js"></script>
 <script src="js/reader.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/appmenu.js"></script>
 <script src="js/install.js"></script>
 <script src="js/import.js"></script>
 <script src="js/box.js"></script>

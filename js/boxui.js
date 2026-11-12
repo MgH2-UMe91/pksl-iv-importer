@@ -1,22 +1,37 @@
-// BOX の画面。保存ボタン(4. エクスポート)と、中身を見る区画(5. BOX)
-// ホーム画面に追加したアプリ(standalone)でだけ使える。ブラウザで開いたときは保存ボタンを灰色にして案内を出す
-// app.js の state・loadRows・esc を使うので、app.js より前に読み込み、app.js の最後で BoxUi.init() を呼ぶ
+// BOX の画面。保存ボタン(取込みタブの4)と、BOX タブ(箱の並び・箱のメニュー・個体の編集画面・CSV の読み込み)
+// ホーム画面に追加したアプリ(standalone)でだけ使える。ブラウザで開いたときは、保存ボタンを灰色にして、BOX タブには案内だけを出す
+// app.js の state・loadRows・esc・ingredientField・evolutionField・selectField などを使うので、app.js より前に読み込み、app.js の最後で BoxUi.init() を呼ぶ
 'use strict';
 
 const BoxUi = (() => {
   let boxes = [Box.load(1), Box.load(2)];
-  let active = 1;        // 5 で見ている BOX
+  let active = 1;        // BOX タブで見ている BOX
   let restoredFrom = 0;  // 3 へ戻した元の BOX(0 なら戻していない)
-  let page = 0;          // 5 のリストのページ(0始まり)。絞り込み・並べ替え・BOX の切り替えで1ページ目に戻る
+  let page = 0;          // 箱の並びのページ(0始まり)。絞り込み・並べ替え・BOX の切り替えで1ページ目に戻る
   let onlyFlag = false;  // 要確認の個体だけを表示しているか
-  let editing = null;    // 5 で開いている1匹の編集欄 { idx: BOX の中の番号, row: 編集中の行 }
+  let selected = null;   // 箱をタップして、メニューを出している個体の番号
+  let sheet = null;      // 開いている編集画面 { idx, row, order, timer }
   let savedSig = '';     // 最後に保存した(または戻した)ときの 3 の中身。違えば「保存していない行がある」
   const enabled = () => Install.standalone();
   const sig = () => JSON.stringify(state.rows.map(Box.pack));
   const unsaved = () => state.rows.length > 0 && sig() !== savedSig;
   const nameOf = (n) => Box.nameOf(boxes[n - 1], n);
   const g = (id) => document.getElementById(id);
+  const okNow = () => !g('copy').disabled;
 
+  // ---------- 上のタブ(取込み / BOX) ----------
+  function setTab(name, remember = true) {
+    const box = name === 'box';
+    g('tab-import').setAttribute('aria-selected', String(!box));
+    g('tab-box').setAttribute('aria-selected', String(box));
+    g('pane-import').hidden = box;
+    g('pane-box').hidden = !box;
+    if (remember) Box.saveTab(name);
+    if (box) renderAll();
+    closeMenus();
+  }
+
+  // ---------- 取込みタブの4: BOX に保存 ----------
   function renderSave(ok) {
     const count = state.rows.length;
     if (!enabled()) {
@@ -67,29 +82,23 @@ const BoxUi = (() => {
     renderSave(true);
   }
 
-  // ---- 5. BOX ----
+  // ---------- BOX タブ: 箱の並び ----------
   function renderTabs() {
     g('box-tabs').innerHTML = [1, 2].map((n) => `<button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}">${esc(nameOf(n))} <small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button>`).join('');
   }
 
   const viewOpts = () => ({ query: g('box-filter').value, ingredient: g('box-ing').value, onlyFlag, sort: g('box-sort').value, page });
+  const label = (a) => `${a[1] || '(種族なし)'}${a[0] ? `(${a[0]})` : ''}`;
 
-  function renderList() {
+  function renderGrid() {
     const data = boxes[active - 1];
     const v = Box.view(data.rows, viewOpts());
     page = v.page;
     if (onlyFlag && !v.flagged) onlyFlag = false; // 要確認がなくなったら、絞り込みを外す
-    g('box-list').innerHTML = v.items.map(({ a, i, flag }) => {
-      const ings = a[4].map((n) => (n ? `<span class="ico sm" title="${esc(n)}" aria-label="${esc(n)}">${INGREDIENT_ICONS[n] ?? ''}</span>` : '<span class="ico sm none" title="未選択">−</span>')).join('');
-      const who = `${esc(a[1])}${a[0] ? `(${esc(a[0])})` : ''}`;
-      const open = editing && editing.idx === i;
-      return `<li data-i="${i}" class="${open ? 'open' : ''}${flag ? ' flag' : ''}"><div class="bhead" role="button" tabindex="0" aria-expanded="${!!open}" data-open="${i}" aria-label="${who}を編集する"><div class="bl1"><b>${esc(a[1] || '(種族なし)')}</b><span class="bnick">${esc(a[0])}</span><span class="blv">Lv${a[2] ?? '?'}</span></div><div class="bl2">${ings}<span class="bnat">${esc(a[5])}</span></div></div><button type="button" class="bx" data-del="${i}" aria-label="${who}を消す">✕</button></li>`;
+    g('box-grid').innerHTML = v.items.map(({ a, i, flag }) => {
+      const ings = a[4].map((n) => (n ? `<span class="ico xs" title="${esc(n)}">${INGREDIENT_ICONS[n] ?? ''}</span>` : '<span class="ico xs none">−</span>')).join('');
+      return `<button type="button" class="cell${flag ? ' flag' : ''}${selected === i ? ' sel' : ''}" data-i="${i}" aria-label="${esc(label(a))}、Lv${a[2] ?? '?'}"><span class="c-lv"><i>Lv.</i>${a[2] ?? '?'}</span><b class="c-name">${esc(a[1] || '(未設定)')}</b><span class="c-nick">${esc(a[0]) || '&nbsp;'}</span><span class="c-ing">${ings}</span></button>`;
     }).join('');
-    if (editing) {
-      const li = g('box-list').querySelector(`li[data-i="${editing.idx}"]`);
-      if (li) mountEditor(li);
-      else closeEdit(); // 絞り込みやページ送りで見えなくなったときは閉じる
-    }
     const total = data.rows.length;
     const flagged = v.flagged; // 辞書にない値などで、出力できない個体
     const fb = g('box-flag');
@@ -100,7 +109,7 @@ const BoxUi = (() => {
     const filtering = g('box-filter').value.trim() || g('box-ing').value || onlyFlag;
     g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${total}匹のうち${v.count}匹を表示しています。` : `${total}匹`)
       + (data.broken ? ' 保存の中身の一部を読めなかったため、読めた分だけを出しています。' : '');
-    // ページ送り(1ページ30匹)。1ページに収まるときは出さない
+    // ページ送り(1ページ40匹)。1ページに収まるときは出さない
     for (const id of ['box-pager-top', 'box-pager-bottom']) {
       const el = g(id);
       el.hidden = v.pages <= 1;
@@ -108,70 +117,204 @@ const BoxUi = (() => {
     }
     for (const id of ['box-restore', 'box-clear']) g(id).disabled = total === 0;
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
+    placeCellMenu();
   }
 
   // 絞り込み・並べ替えを変えたら1ページ目に戻る
-  const firstPage = () => { page = 0; closeEdit(); renderList(); };
+  const firstPage = () => { page = 0; selected = null; renderGrid(); };
 
-  // ---- 1匹ずつ直す ----
-  // 3の行の編集欄(app.js の rowHtml)をそのまま使う。編集中の行は extraRows に登録して、入力・進化・種族の検索も同じ部品で動かす
-  function mountEditor(li) {
-    const row = editing.row;
-    const box = document.createElement('div');
-    box.className = 'box-edit';
-    box.innerHTML = `<div class="row" data-id="${row.id}">${rowHtml(row, true)}</div><div class="actions box-edit-actions"><button type="button" id="box-edit-save" class="primary">保存</button><button type="button" id="box-edit-cancel">やめる</button></div>`;
-    li.append(box);
-    afterEdit(row);
-    refreshRow(row, box.firstChild);
+  function renderAll() {
+    const on = enabled();
+    g('box-app').hidden = !on;
+    g('box-browser-note2').hidden = on;
+    if (!on) return;
+    renderTabs();
+    renderGrid();
   }
 
-  function openEdit(i) {
-    closeEdit();
-    const p = Box.unpack(boxes[active - 1].rows[i]);
+  // ---------- 箱のメニュー(編集・削除)と、そのほかのメニュー(⋯) ----------
+  function placeCellMenu() {
+    const menu = g('box-cell-menu');
+    const cell = selected === null ? null : g('box-grid').querySelector(`.cell[data-i="${selected}"]`);
+    if (!cell) { menu.hidden = true; return; }
+    menu.hidden = false;
+    const wrap = g('box-grid-wrap');
+    const left = Math.max(0, Math.min(cell.offsetLeft, wrap.clientWidth - menu.offsetWidth));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${cell.offsetTop + cell.offsetHeight + 4}px`;
+  }
+
+  function closeMenus() {
+    if (selected !== null) { selected = null; for (const c of g('box-grid').querySelectorAll('.cell.sel')) c.classList.remove('sel'); }
+    g('box-cell-menu').hidden = true;
+    g('box-more').hidden = true;
+    g('box-more-btn').setAttribute('aria-expanded', 'false');
+  }
+
+  function selectCell(i) {
+    closeMenus();
+    selected = i;
+    const cell = g('box-grid').querySelector(`.cell[data-i="${i}"]`);
+    if (cell) cell.classList.add('sel');
+    placeCellMenu();
+  }
+
+  function deleteCell() {
+    const i = selected;
+    if (i === null) return;
+    const a = boxes[active - 1].rows[i];
+    closeMenus();
+    ask(`「${esc(label(a))}」を消しますか？<b class="box-danger">この操作は取り消せません。</b>`, [
+      { label: '消す', cls: 'danger', fn: () => {
+        const data = boxes[active - 1];
+        Box.save(active, { name: data.name, rows: Box.removeAt(data.rows, i) });
+        boxes[active - 1] = Box.load(active);
+        renderAll();
+        renderSave(okNow());
+      } },
+      { label: 'やめる' },
+    ]);
+  }
+
+  // ---------- 個体の編集画面(全画面のシート) ----------
+  const NATURE_UP = '▲', NATURE_DOWN = '▼';
+  const fxHtml = (nature) => {
+    const fx = Box.natureEffect(nature);
+    return fx ? `<span class="fx-up">${NATURE_UP} ${esc(fx.up)}</span><span class="fx-down">${NATURE_DOWN} ${esc(fx.down)}</span>` : '<span class="fx-none">補正なし</span>';
+  };
+
+  // app.js の renderRow が、編集画面の行を描き直すときにも使う。3の行の編集部品(食材・進化・選択欄)をそのまま使う
+  function sheetHtml(row) {
+    const own = Match.ingredientsOf(row.species) ?? INGREDIENTS;
+    const lv = Number.isFinite(row.level) ? row.level : '';
+    const skills = ['', 1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}"${n === row.skillLevel ? ' selected' : ''}>${n === '' ? '(なし)' : `Lv.${n}`}</option>`).join('');
+    return `
+    <div class="sheet-top">
+      <label class="field sheet-nick" data-key="nickname"><input type="text" data-edit="nickname" value="${esc(row.nickname)}" placeholder="ニックネーム" autocomplete="off" aria-label="ニックネーム"></label>
+    </div>
+    <div class="sheet-block">
+      <div class="field" data-key="species"><span>ポケモン</span>
+        <input type="text" data-species value="${esc(row.species)}" placeholder="名前で検索" autocomplete="off">
+      </div>
+      ${evolutionField(row)}
+    </div>
+    <div class="sheet-block">
+      <label class="field" data-key="level"><span>レベル</span><input type="number" data-edit="level" min="1" max="100" value="${lv}" inputmode="numeric"></label>
+      <div class="lv-slider"><button type="button" data-lv-step="-1" aria-label="レベルを1下げる">◀</button><input type="range" data-edit="level" min="1" max="100" value="${lv === '' ? 1 : lv}" aria-label="レベルのスライダー"><button type="button" data-lv-step="1" aria-label="レベルを1上げる">▶</button></div>
+    </div>
+    <div class="sheet-block">${ingredientField(row, own)}</div>
+    <h3 class="band">メインスキル・サブスキル</h3>
+    <div class="sheet-block">
+      <label class="field" data-key="skillLevel"><span>メインスキルのレベル</span><select data-edit="skillLevel">${skills}</select></label>
+      <div class="sub-grid">${row.sub.map((s, i) => selectField(`Lv${[10, 25, 50, 75, 100][i]}`, `sub${i}`, s, SUBSKILLS)).join('')}</div>
+    </div>
+    <h3 class="band">詳細ステータス</h3>
+    <div class="sheet-block">
+      <div class="nature-row">${selectField('性格', 'nature', row.nature, NATURES)}<div class="fx" aria-label="性格の補正">${fxHtml(row.nature)}</div></div>
+      <label class="field" data-key="ribbon"><span>一緒に眠った時間</span><select data-edit="ribbon">${RIBBONS.map((h) => `<option value="${h}"${h === row.ribbon ? ' selected' : ''}>${RIBBON_LABELS[h]}</option>`).join('')}</select></label>
+      <div class="checks"><label class="check"><input type="checkbox" data-edit="shiny"${row.shiny ? ' checked' : ''}>色違い</label><label class="check"><input type="checkbox" data-edit="mint"${row.mint ? ' checked' : ''}>ミント使用</label></div>
+    </div>
+    <p class="seed-note" hidden></p>
+    <ul class="messages"></ul>`;
+  }
+
+  const sheetEl = () => g('box-sheet-row');
+
+  // BOX の番号 idx の個体を、編集画面の行にする
+  function loadSheetRow(idx) {
+    if (sheet && sheet.row) extraRows.delete(sheet.row.id);
+    const p = Box.unpack(boxes[active - 1].rows[idx]);
     const row = Object.assign(newRow(), p, { manualLevel: Number.isFinite(p.level) ? p.level : null, readSkill: p.skillLevel });
     row.low = new Set(Box.lowKeys(row)); // 辞書にない値などの項目をオレンジ枠にする
     extraRows.set(row.id, row);
-    editing = { idx: i, row };
-    renderList();
-    const li = g('box-list').querySelector(`li[data-i="${i}"]`);
-    if (li) li.scrollIntoView({ block: 'nearest' });
+    sheet.idx = idx;
+    sheet.row = row;
+    sheetEl().dataset.id = row.id;
+    sheetEl().innerHTML = sheetHtml(row);
+    refreshRow(row, sheetEl());
+    updateSheetNav();
+    g('box-sheet').querySelector('.sheet-scroll').scrollTop = 0;
   }
 
-  function closeEdit() {
-    if (!editing) return;
-    extraRows.delete(editing.row.id);
-    editing = null;
-    for (const el of g('box-list').querySelectorAll('li.open')) { el.classList.remove('open'); el.querySelector('.box-edit')?.remove(); }
+  function updateSheetNav() {
+    g('sheet-prev').disabled = Box.neighbor(sheet.order, sheet.idx, -1) === null;
+    g('sheet-next').disabled = Box.neighbor(sheet.order, sheet.idx, 1) === null;
   }
 
-  // 直す項目が残っている間は保存できない(3の4と同じ基準)
-  function afterEdit(row) {
-    const b = g('box-edit-save');
-    if (b && editing && editing.row === row) b.disabled = Match.checkRow(row).errors.length > 0;
+  function openSheet(idx) {
+    closeMenus();
+    const order = Box.view(boxes[active - 1].rows, { ...viewOpts(), page: 0 }).order; // 今の並び・絞り込みで前後へ移れるように
+    sheet = { idx, row: null, order, timer: 0 };
+    loadSheetRow(idx);
+    document.documentElement.classList.add('modal-open');
+    const d = g('box-sheet');
+    if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+    g('sheet-close').focus({ preventScroll: true }); // 入力欄にフォーカスを当てない(キーボードを出さない)
   }
 
-  function saveEdit() {
-    if (!editing || Match.checkRow(editing.row).errors.length) return;
+  // 変更はその場で BOX に保存する(保存ボタンはない)。確認が必要な項目が残っていても保存し、箱をオレンジ枠にする
+  function persist() {
+    if (!sheet) return;
+    clearTimeout(sheet.timer);
+    sheet.timer = 0;
     const data = boxes[active - 1];
-    const rows = Box.replaceAt(data.rows, editing.idx, Box.pack(editing.row));
-    if (!Box.save(active, { name: data.name, rows })) {
-      g('box-count').textContent = '保存できませんでした。端末の空き容量や、ブラウザの設定を確かめてください。';
-      return;
-    }
-    boxes[active - 1] = Box.load(active);
-    closeEdit();
+    const rows = Box.replaceAt(data.rows, sheet.idx, Box.pack(sheet.row));
+    if (Box.save(active, { name: data.name, rows })) boxes[active - 1] = Box.load(active);
+  }
+
+  function afterEdit(row) {
+    if (!sheet || sheet.row !== row) return;
+    const root = sheetEl();
+    const num = root.querySelector('input[type="number"][data-edit="level"]');
+    const rng = root.querySelector('input[type="range"][data-edit="level"]');
+    const lv = Number.isFinite(row.level) ? String(row.level) : '';
+    if (num && document.activeElement !== num) num.value = lv;
+    if (rng && document.activeElement !== rng) rng.value = lv === '' ? '1' : lv;
+    const fx = root.querySelector('.fx');
+    if (fx) fx.innerHTML = fxHtml(row.nature);
+    clearTimeout(sheet.timer);
+    sheet.timer = setTimeout(persist, 250);
+  }
+
+  function stepLevel(delta) {
+    const row = sheet.row;
+    const now = Number.isFinite(row.level) ? row.level : 0;
+    row.level = Math.min(100, Math.max(1, now + delta));
+    row.manualLevel = row.level;
+    row.low.delete('level');
+    sheetEl().querySelector('input[type="number"][data-edit="level"]').value = String(row.level);
+    sheetEl().querySelector('input[type="range"][data-edit="level"]').value = String(row.level);
+    touch(row);
+  }
+
+  function moveSheet(delta) {
+    const next = Box.neighbor(sheet.order, sheet.idx, delta);
+    if (next === null) return;
+    persist();
+    loadSheetRow(next);
+  }
+
+  // 編集画面を閉じる(✕・Esc のどちらでも通る)。保存してから、その個体のページの並びに戻る
+  function finishSheet() {
+    if (!sheet) return;
+    persist();
+    extraRows.delete(sheet.row.id);
+    const idx = sheet.idx, order = sheet.order;
+    sheet = null;
+    document.documentElement.classList.remove('modal-open');
+    page = Box.pageOf(order, idx);
     renderAll();
     renderSave(okNow());
   }
 
-  function renderAll() {
-    g('box-section').hidden = !enabled();
-    if (!enabled()) return;
-    renderTabs();
-    renderList();
+  function closeSheet() {
+    const d = g('box-sheet');
+    if (typeof d.close === 'function' && d.open) d.close(); else d.removeAttribute('open');
+    finishSheet();
   }
 
-  // 確認などの欄。buttons: [{ label, cls, fn }]
+  // ---------- 確認などの欄 ----------
+  // buttons: [{ label, cls, fn }]
   function ask(html, buttons) {
     const el = g('box-confirm');
     el.hidden = false;
@@ -184,9 +327,9 @@ const BoxUi = (() => {
       btn.addEventListener('click', () => { closeAsk(); if (b.fn) b.fn(); });
       el.lastChild.append(btn);
     }
+    el.scrollIntoView({ block: 'nearest' });
   }
   const closeAsk = () => { g('box-confirm').hidden = true; g('box-confirm').innerHTML = ''; };
-  const okNow = () => !g('copy').disabled;
 
   function rename() {
     const el = g('box-confirm');
@@ -206,18 +349,18 @@ const BoxUi = (() => {
   }
 
   function restore() {
-    closeEdit();
     const n = active;
     const go = () => {
       loadRows(boxes[n - 1].rows.map(Box.unpack));
       restoredFrom = n;
       savedSig = sig();
       renderSave(okNow());
+      setTab('import');
       g('list-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     if (!unsaved()) { go(); return; }
     ask('3の一覧に、BOXに保存していない行があります。戻すと、その行は消えます。', [
-      { label: '先にBOXへ保存する', cls: 'primary', fn: () => g('box-save').scrollIntoView({ behavior: 'smooth', block: 'center' }) },
+      { label: '先にBOXへ保存する', cls: 'primary', fn: () => { setTab('import'); g('box-save').scrollIntoView({ behavior: 'smooth', block: 'center' }); } },
       { label: '消して戻す', fn: go },
       { label: 'やめる' },
     ]);
@@ -242,7 +385,6 @@ const BoxUi = (() => {
   }
 
   function clear() {
-    closeEdit();
     const n = active;
     ask(`「${esc(nameOf(n))}」の${boxes[n - 1].rows.length}匹をすべて消します。<b class="box-danger">この操作は取り消せません。</b>`, [
       { label: '空にする', cls: 'danger', fn: () => {
@@ -255,7 +397,7 @@ const BoxUi = (() => {
     ]);
   }
 
-  // ---- CSV の読み込み(いま見ている BOX へ直接追加する。ダイアログで貼り付ける) ----
+  // ---------- CSV の読み込み(いま見ている BOX へ直接追加する。ダイアログで貼り付ける) ----------
   const dlg = () => g('box-import-dialog');
   const clearImportMessages = () => {
     for (const id of ['box-import-warn', 'box-import-result']) g(id).textContent = '';
@@ -263,7 +405,7 @@ const BoxUi = (() => {
   };
 
   function openImport() {
-    closeEdit();
+    closeMenus();
     closeAsk();
     g('box-import-title').textContent = `${nameOf(active)}にインポート`;
     g('box-import-text').value = '';
@@ -310,29 +452,34 @@ const BoxUi = (() => {
     }
     boxes[n - 1] = Box.load(n);
     const check = r.rows.filter((x) => Box.needsCheck(Box.pack(x))).length;
-    const done = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(オレンジ枠の行を押して直してください)。` : ''}${r.problems.length ? ` 読めなかった行: ${r.problems.map((x) => `${x.line ? `${x.line}行目: ` : ''}${x.message}`).join(' ')}` : ''}`;
+    const done = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(オレンジ枠の箱を押して直してください)。` : ''}${r.problems.length ? ` 読めなかった行: ${r.problems.map((x) => `${x.line ? `${x.line}行目: ` : ''}${x.message}`).join(' ')}` : ''}`;
     closeImport(); // 成功したら閉じる(貼り付け欄も空になる)
     page = 0; onlyFlag = false;
     renderAll();
     renderSave(okNow());
-    g('box-import-done').textContent = done; // 結果は5のリストの上に出す
+    g('box-import-done').textContent = done; // 結果は箱の並びの上に出す
   }
 
   function init() {
+    // 上のタブ
+    g('tab-import').addEventListener('click', () => setTab('import'));
+    g('tab-box').addEventListener('click', () => setTab('box'));
     for (const n of [1, 2]) g(`box-save-${n}`).addEventListener('click', () => save(n));
     g('box-guide').addEventListener('click', () => Install.guide());
+    g('box-guide2').addEventListener('click', () => Install.guide());
+    // BOX の切り替え・絞り込み・ページ送り
     g('box-tabs').addEventListener('click', (ev) => {
       const t = ev.target.closest('[data-tab]');
       if (!t) return;
       active = Number(t.dataset.tab);
       page = 0;
       onlyFlag = false;
-      closeEdit();
+      selected = null;
       closeAsk();
       g('box-import-done').textContent = '';
       renderAll();
     });
-    g('box-ing').innerHTML = '<option value="">食材: すべて</option>' + INGREDIENTS.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    g('box-ing').innerHTML = '<option value="">食材</option>' + INGREDIENTS.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
     g('box-filter').addEventListener('input', firstPage);
     g('box-ing').addEventListener('change', firstPage);
     g('box-sort').addEventListener('change', firstPage);
@@ -342,31 +489,56 @@ const BoxUi = (() => {
         const b = ev.target.closest('[data-page]');
         if (!b || b.disabled) return;
         page = Number(b.dataset.page);
-        closeEdit();
-        renderList();
-        if (id === 'box-pager-bottom') g('box-tabs').scrollIntoView({ block: 'start' }); // 下で送ったときは、リストの先頭へ戻る
+        selected = null;
+        renderGrid();
+        if (id === 'box-pager-bottom') g('box-tabs').scrollIntoView({ block: 'start' }); // 下で送ったときは、先頭へ戻る
       });
     }
-    bindRowEvents(g('box-list')); // 編集欄の入力は、3の行と同じ処理
-    g('box-list').addEventListener('click', (ev) => {
-      if (ev.target.closest('#box-edit-save')) { saveEdit(); return; }
-      if (ev.target.closest('#box-edit-cancel')) { closeEdit(); return; }
-      const h = ev.target.closest('[data-open]');
-      if (h) { const i = Number(h.dataset.open); if (editing && editing.idx === i) closeEdit(); else openEdit(i); return; }
-      const d = ev.target.closest('[data-del]');
-      if (!d) return;
-      closeEdit(); // 番号がずれるので、開いている編集欄は先に閉じる
-      const data = boxes[active - 1];
-      data.rows.splice(Number(d.dataset.del), 1);
-      Box.save(active, data);
-      boxes[active - 1] = Box.load(active);
-      renderAll();
-      renderSave(okNow());
+    // 箱をタップしたメニュー(編集・削除)
+    g('box-grid').addEventListener('click', (ev) => {
+      const c = ev.target.closest('.cell');
+      if (!c) return;
+      ev.stopPropagation();
+      const i = Number(c.dataset.i);
+      if (selected === i) closeMenus(); else selectCell(i);
     });
-    g('box-list').addEventListener('keydown', (ev) => {
-      const h = ev.target.closest('[data-open]');
-      if (h && (ev.key === 'Enter' || ev.key === ' ') && ev.target === h) { ev.preventDefault(); h.click(); }
+    g('cell-edit').addEventListener('click', () => { const i = selected; if (i !== null) openSheet(i); });
+    g('cell-delete').addEventListener('click', deleteCell);
+    // メニューの外を押すと閉じる
+    document.addEventListener('click', (ev) => {
+      if (!ev.target.closest('.cell, #box-cell-menu, #box-more, #box-more-btn')) closeMenus();
     });
+    // ⋯ のメニュー
+    g('box-more-btn').addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const open = g('box-more').hidden;
+      closeMenus();
+      g('box-more').hidden = !open;
+      g('box-more-btn').setAttribute('aria-expanded', String(open));
+      if (open) {
+        const b = g('box-more-btn');
+        const m = g('box-more');
+        m.style.top = `${b.offsetTop + b.offsetHeight + 4}px`;
+        m.style.right = `${Math.max(0, b.offsetParent.clientWidth - (b.offsetLeft + b.offsetWidth))}px`;
+      }
+    });
+    g('box-rename').addEventListener('click', () => { closeMenus(); rename(); });
+    g('box-file').addEventListener('click', () => { closeMenus(); file(); });
+    g('box-restore').addEventListener('click', () => { closeMenus(); restore(); });
+    g('box-clear').addEventListener('click', () => { closeMenus(); clear(); });
+    g('box-copy').addEventListener('click', copy);
+    // 編集画面(全画面)。入力・進化・種族の検索は、3の行と同じ処理
+    bindRowEvents(g('box-sheet'));
+    g('box-sheet').addEventListener('click', (ev) => {
+      const s = ev.target.closest('[data-lv-step]');
+      if (s && sheet) stepLevel(Number(s.dataset.lvStep));
+    });
+    g('sheet-prev').addEventListener('click', () => moveSheet(-1));
+    g('sheet-next').addEventListener('click', () => moveSheet(1));
+    g('sheet-close').addEventListener('click', closeSheet);
+    g('box-sheet').addEventListener('close', finishSheet);
+    g('box-sheet').addEventListener('cancel', finishSheet); // Esc: 保存して後片付けをする(close でも同じ処理が通る)
+    // CSV の読み込みのダイアログ
     g('box-import-open').addEventListener('click', openImport);
     g('box-import-close').addEventListener('click', closeImport);
     g('box-import-run').addEventListener('click', () => importInto(g('box-import-text').value));
@@ -387,8 +559,7 @@ const BoxUi = (() => {
     dlg().addEventListener('click', (ev) => { if (ev.target === dlg()) closeImport(); });
     dlg().addEventListener('close', afterImportClosed);
     dlg().addEventListener('cancel', afterImportClosed); // Esc は cancel のあとに close になる。どちらでも片付ける
-    // 「ファイルを選ぶ」は <label> が <input type=file> を包む形(タップがそのまま input に届く。iOS は選択欄などから click() で開くと断ることがある)
-    // accept は付けない(iOS のファイルアプリで .csv・.tsv がグレーになることがあるため)。選んだ内容は貼り付け欄に入れ、中身で判定する
+    // 「ファイルを選ぶ」は <label> が <input type=file> を包む形(タップがそのまま input に届く)。accept は付けない
     g('box-import-file').addEventListener('change', async (ev) => {
       const file = ev.target.files[0];
       ev.target.value = '';
@@ -399,14 +570,10 @@ const BoxUi = (() => {
         g('box-import-result').textContent = `ファイル「${file.name}」の内容を貼り付け欄に入れました。確かめて「インポート」を押してください。`;
       } catch (e) { g('box-import-warn').textContent = `ファイルを読めませんでした: ${e.message}`; }
     });
-    g('box-rename').addEventListener('click', rename);
-    g('box-copy').addEventListener('click', copy);
-    g('box-file').addEventListener('click', file);
-    g('box-restore').addEventListener('click', restore);
-    g('box-clear').addEventListener('click', clear);
+    setTab(Box.loadTab(), false); // 前回のタブを開く
     renderAll();
     renderSave(okNow());
   }
 
-  return { init, renderSave, renderAll, afterEdit, _state: () => ({ boxes, active, restoredFrom, savedSig }) };
+  return { init, renderSave, renderAll, afterEdit, sheetHtml, setTab, _state: () => ({ boxes, active, restoredFrom, savedSig, sheet, selected, page }) };
 })();

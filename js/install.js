@@ -4,7 +4,7 @@
 // 読み取り中や、読み取った結果・手入力の行があるときは出さない(出ていても、操作を始めたら閉じる)
 // 保存は端末の localStorage だけ。使えなければ数えられないので出さない
 // BOX の保存はホーム画面のアプリの中だけ(ブラウザ版には保存しない)ので、ブラウザとアプリで保存が別になる注意は要らない
-// guide() は BOX のボタンの横の「追加のしかた」から開く。回数や「あとで」に関係なく出し、閉じるボタンだけにする
+// guide() は BOX のボタンの横の「追加のしかた」や、帯の ⋮ メニューの「ホーム画面に追加」から開く。回数や「あとで」に関係なく出し、閉じるボタンだけにする
 const Install = (() => {
   const KEY = 'iv-importer-install';
   const LATER_MS = 14 * 86400000;
@@ -55,15 +55,15 @@ const Install = (() => {
       pop.querySelector('#ipNever').onclick = () => { save({ never: true }); close(); };
     }
     closer = close;
-    if (kind === 'android') {
+    if (kind !== 'ios') { // Android と、それ以外(パソコンなど。メニューから開いたときだけ来る)
       const box = pop.querySelector('.ip-android');
       setBtn = () => {
         if (evt) {
           box.innerHTML = '<button type="button" class="primary" id="ipAdd">追加する</button>';
           box.querySelector('#ipAdd').onclick = async () => {
             const ev = evt; evt = null;
-            try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === 'accepted') { save({ never: true }); close(); } else later(); }
-            catch (e) { later(); }
+            try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === 'accepted') { save({ never: true }); close(); } else if (force) close(); else later(); }
+            catch (e) { if (force) close(); else later(); }
           };
         } else {
           box.innerHTML = '<ol><li>画面の右上の︙メニューをタップ</li><li>「ホーム画面に追加」または「アプリをインストール」をタップ</li></ol>';
@@ -79,6 +79,16 @@ const Install = (() => {
     // 操作を始めたら閉じる(次の訪問でまた出る)
     standalone,
     guide() { active = true; show(true); },
+    // Android などで追加の画面を取ってあれば、案内を出さずにそのまま出す。取れていなければ false(案内を出す側に任せる)
+    // ボタンを押した処理の中で、最初に呼ぶこと(利用者の操作と見なされないと、ブラウザが断る)
+    addNow() {
+      const ev = evt;
+      if (!ev) return false;
+      evt = null;
+      ev.prompt();
+      Promise.resolve(ev.userChoice).then((r) => { if (r && r.outcome === 'accepted') { save({ never: true }); close(); } }).catch(() => {});
+      return true;
+    },
     dismiss() { if (document.getElementById('installPop')) close(); active = false; },
     _test: { eligible, load, KEY },
   };

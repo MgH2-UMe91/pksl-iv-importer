@@ -222,23 +222,23 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
 // BOX のリスト(ページ分け・絞り込み)
 {
   const mkRow = (i, o = {}) => Box.pack(row({ nickname: `n${i}`, level: 20 + (i % 50), ...o }));
-  const rows = Array.from({ length: 70 }, (_, i) => mkRow(i));
+  const rows = Array.from({ length: 90 }, (_, i) => mkRow(i));
   const v0 = Box.view(rows, {});
-  eq('1ページ30匹(70匹なら3ページ)', [v0.items.length, v0.pages, v0.page, v0.count], [30, 3, 0, 70]);
+  eq('1ページ40匹(4列×10行。90匹なら3ページ)', [v0.items.length, v0.pages, v0.page, v0.count, Box.PAGE_SIZE], [40, 3, 0, 90, 40]);
   eq('最後のページは残りの10匹', Box.view(rows, { page: 2 }).items.length, 10);
-  eq('ページ送りで続きが出る(31番目から)', Box.view(rows, { page: 1 }).items[0].i, 30);
+  eq('ページ送りで続きが出る(41番目から)', Box.view(rows, { page: 1 }).items[0].i, 40);
   eq('範囲外のページは最後のページにそろえる', Box.view(rows, { page: 99 }).page, 2);
   eq('負のページは1ページ目', Box.view(rows, { page: -3 }).page, 0);
   eq('空のBOXは1ページ', [Box.view([], {}).pages, Box.view([], {}).items.length], [1, 0]);
-  eq('30匹ちょうどは1ページ', Box.view(rows.slice(0, 30), {}).pages, 1);
-  eq('31匹は2ページ', Box.view(rows.slice(0, 31), {}).pages, 2);
-  eq('新しい順は後ろから', Box.view(rows, { sort: 'newest' }).items[0].i, 69);
+  eq('40匹ちょうどは1ページ(ページ送りは出ない)', Box.view(rows.slice(0, 40), {}).pages, 1);
+  eq('41匹は2ページ', Box.view(rows.slice(0, 41), {}).pages, 2);
+  eq('新しい順は後ろから', Box.view(rows, { sort: 'newest' }).items[0].i, 89);
   eq('レベルの高い順', Box.view(rows, { sort: 'level' }).items[0].a[2], 69);
-  eq('名前の絞り込み(ニックネーム)', Box.view(rows, { query: 'n7' }).items.map((x) => x.i), [7]);
+  eq('名前の絞り込み(ニックネーム)', Box.view(rows, { query: 'n77' }).items.map((x) => x.i), [77]);
   eq('絞り込み後の件数とページ数', (() => { const v = Box.view(rows, { query: 'n1' }); return [v.count, v.pages]; })(), [11, 1]);
 
   const ing = rows.map((r, i) => (i % 5 === 0 ? Box.pack(row({ nickname: `n${i}`, ing: ['あまいミツ', 'あんみんトマト', 'ほっこりポテト'] })) : Box.pack(row({ nickname: `n${i}`, ing: ['あまいミツ', 'あんみんトマト', ''] }))));
-  eq('食材で絞り込む(その食材を持つ個体だけ)', Box.view(ing, { ingredient: 'ほっこりポテト' }).count, 14);
+  eq('食材で絞り込む(その食材を持つ個体だけ)', Box.view(ing, { ingredient: 'ほっこりポテト' }).count, 18);
   eq('食材の絞り込みと名前の絞り込みは両方かかる', Box.view(ing, { ingredient: 'ほっこりポテト', query: 'n10' }).items.map((x) => x.i), [10]);
   eq('どの個体も持たない食材なら0匹で1ページ', (() => { const v = Box.view(ing, { ingredient: 'ピュアなオイル' }); return [v.count, v.pages]; })(), [0, 1]);
   eq('絞り込みの結果がページに収まらなければ分ける', Box.view(rows.concat(rows), { ingredient: 'あまいミツ' }).pages, 5);
@@ -252,6 +252,73 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('クリップボードが空でも案内する', /空でした/.test(Box.clipboardNotice('  \n')), true);
   eq('クリップボードに中身があれば案内はない', Box.clipboardNotice('a,b'), '');
   eq('要確認の印は各個体に付く', Box.view(mixed, {}).items.filter((x) => x.flag).map((x) => x.i), [3]);
+}
+
+// 画面の作り直し: タブ・箱のメニュー・編集画面の前後の移動
+{
+  // ユーザーが出した性格の表(行が上がる項目、列が下がる項目。対角が補正なしの5つ)
+  const STATS = ['おてつだいスピード', 'げんき回復量', '食材おてつだい確率', 'メインスキル発生確率', 'EXP獲得量'];
+  const CHART = [
+    ['がんばりや', 'さみしがり', 'いじっぱり', 'やんちゃ', 'ゆうかん'],
+    ['ずぶとい', 'すなお', 'わんぱく', 'のうてんき', 'のんき'],
+    ['ひかえめ', 'おっとり', 'てれや', 'うっかりや', 'れいせい'],
+    ['おだやか', 'おとなしい', 'しんちょう', 'きまぐれ', 'なまいき'],
+    ['おくびょう', 'せっかち', 'ようき', 'むじゃき', 'まじめ'],
+  ];
+  const mismatches = [];
+  CHART.forEach((line, up) => line.forEach((name, down) => {
+    const got = Box.natureEffect(name);
+    const want = up === down ? null : { up: STATS[up], down: STATS[down] };
+    if (JSON.stringify(got) !== JSON.stringify(want)) mismatches.push(`${name}: ${JSON.stringify(got)}`);
+  }));
+  eq('性格の補正が、ユーザーの表の25件すべてと一致する', mismatches, []);
+  eq('表の25の性格は、辞書の25の性格と同じ', CHART.flat().sort(), [...NATURES].sort());
+  eq('補正のない性格は5つ(がんばりや・すなお・てれや・きまぐれ・まじめ)', CHART.flat().filter((n) => !Box.natureEffect(n)).sort(), ['がんばりや', 'きまぐれ', 'すなお', 'てれや', 'まじめ']);
+  eq('補正のある性格は20(上がる・下がるが別の項目)', Object.values(Box.NATURE_FX).filter(([u, d]) => u !== d).length, 20);
+  eq('空の性格・辞書にない性格は補正なし', [Box.natureEffect(''), Box.natureEffect('へんな')], [null, null]);
+
+  const order = [5, 2, 9, 7];
+  eq('次の個体へ移る(並びの順)', Box.neighbor(order, 5, 1), 2);
+  eq('前の個体へ移る', Box.neighbor(order, 9, -1), 2);
+  eq('先頭より前へは移れない', Box.neighbor(order, 5, -1), null);
+  eq('末尾より後ろへは移れない', Box.neighbor(order, 7, 1), null);
+  eq('並びにない個体からは移れない', Box.neighbor(order, 3, 1), null);
+  const rows = Array.from({ length: 90 }, (_, i) => Box.pack(row({ nickname: `n${i}` })));
+  const v = Box.view(rows, { sort: 'newest' });
+  eq('絞り込み・並べ替え後の全ページ分の並びを返す', [v.order.length, v.order[0], v.order[89]], [90, 89, 0]);
+  eq('並びの端から次のページの個体へも移れる(40番目の次は41番目)', Box.neighbor(v.order, v.order[39], 1), v.order[40]);
+  eq('個体のページを求める', [Box.pageOf(v.order, v.order[0]), Box.pageOf(v.order, v.order[39]), Box.pageOf(v.order, v.order[40]), Box.pageOf(v.order, 12345)], [0, 0, 1, 0]);
+  const edit = Box.replaceAt(rows, 41, Box.pack(row({ nickname: 'その場で保存', level: 70 })));
+  eq('その場の保存で件数と他の個体は変わらない', [edit.length, edit[40][0], edit[41][0], edit[42][0], edit[41][2]], [90, 'n40', 'その場で保存', 'n42', 70]);
+  eq('箱を1つ消すと、その個体だけが減る', (() => { const r = Box.removeAt(rows, 3); return [r.length, r[3][0], rows.length]; })(), [89, 'n4', 90]);
+  eq('範囲外の削除は何も消さない', Box.removeAt(rows, 999).length, 90);
+
+  localStorage.removeItem(Box.TAB_KEY);
+  eq('タブを覚えていなければ取込み', Box.loadTab(), 'import');
+  Box.saveTab('box');
+  eq('選んだタブを覚える(BOX)', Box.loadTab(), 'box');
+  Box.saveTab('import');
+  eq('選んだタブを覚える(取込み)', Box.loadTab(), 'import');
+  localStorage.setItem(Box.TAB_KEY, 'へんな値');
+  eq('覚えている値が壊れていれば取込み', Box.loadTab(), 'import');
+  localStorage.removeItem(Box.TAB_KEY);
+}
+
+// 見た目(自動・ライト・ダーク)
+{
+  localStorage.removeItem(Theme.KEY);
+  eq('覚えていなければ自動', Theme.load(), 'auto');
+  eq('ライトを覚える', (Theme.save('light'), Theme.load()), 'light');
+  eq('ダークを覚える', (Theme.save('dark'), Theme.load()), 'dark');
+  eq('自動に戻すと覚えている値を消す', (Theme.save('auto'), [Theme.load(), localStorage.getItem(Theme.KEY)]), ['auto', null]);
+  localStorage.setItem(Theme.KEY, 'へんな値');
+  eq('覚えている値が壊れていれば自動', Theme.load(), 'auto');
+  const root = document.createElement('html');
+  Theme.apply('light', root); eq('ライトは data-theme に付く', root.dataset.theme, 'light');
+  Theme.apply('dark', root); eq('ダークは data-theme に付く', root.dataset.theme, 'dark');
+  Theme.apply('auto', root); eq('自動は data-theme を外す(端末の設定に合わせる)', root.dataset.theme, undefined);
+  eq('3つの選択肢', [Theme.MODES, Theme.MODES.map((m) => Theme.LABELS[m])], [['auto', 'light', 'dark'], ['自動', 'ライト', 'ダーク']]);
+  localStorage.removeItem(Theme.KEY);
 }
 
 // CSV・TSV の読み込み
