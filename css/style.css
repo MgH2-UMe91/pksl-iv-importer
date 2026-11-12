@@ -416,16 +416,16 @@ main { padding-top: 12px; }
 .box-tools { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 6px; margin-top: 8px; }
 .box-tools #box-filter { grid-column: auto; }
 .box-tools input, .box-tools select { min-width: 0; padding: 6px 6px; text-overflow: ellipsis; }
-.box-grid-wrap { position: relative; margin: 6px 0; }
-.box-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 82%; }
-.cell { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; min-height: 0; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--text); text-align: left; overflow: hidden; line-height: 1.2; }
+.box-grid-wrap { position: relative; margin: 6px 0; container-type: inline-size; }
+.box-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; width: 90%; }
+.cell { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; min-height: 0; padding: 3px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--text); text-align: left; overflow: hidden; line-height: 1.2; }
 .cell.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-.cell.flag { border: 2px solid var(--low-line); padding: 3px; }
+.cell.flag { border: 2px solid var(--low-line); padding: 2px; }
 .cell .c-lv { font-size: 9.5px; color: var(--muted); }
 .cell .c-lv i { font-style: normal; color: #3ea35a; }
 .cell.sel .c-lv, .cell.sel .c-nick { color: var(--accent-text); }
-.cell .c-name { max-width: 100%; font-size: min(14px, calc((((100vw - 32px) * 0.82 - 18px) / 4 - 8px) / 4.8)); font-weight: 700; letter-spacing: -0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cell .c-nick { max-width: 100%; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.2em; }
+.cell .c-name { max-width: 100%; font-size: 10.5px; font-size: min(13px, calc(((90cqw - 12px) / 4 - 8px) / 5.8)); font-weight: 700; letter-spacing: -0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 6文字(iPhone のかなは全角幅)が入る大きさ。上限は13px */
+.cell .c-nick { max-width: 100%; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.2em; }
 .cell .c-ing { display: flex; gap: 1px; margin-top: 1px; }
 .ico.xs { width: 16px; height: 16px; padding: 1px; flex: 0 0 auto; }
 .ico.xs.none { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: var(--muted); }
