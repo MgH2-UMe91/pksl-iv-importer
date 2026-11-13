@@ -40,16 +40,6 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 </nav>
 <div id="box-top" class="box-top" hidden>
   <div class="box-tabs" id="box-tabs" role="tablist"></div>
-  <div class="box-tools">
-    <input id="box-filter" type="search" placeholder="名前で絞込" autocomplete="off" aria-label="名前・ニックネームで絞り込む">
-    <select id="box-ing" aria-label="食材で絞り込む"></select>
-    <select id="box-sort" aria-label="並べ替え">
-      <option value="added">追加順</option>
-      <option value="newest">新しい順</option>
-      <option value="species">種族名順</option>
-      <option value="level">レベル順</option>
-    </select>
-  </div>
   <div class="sel-row">
     <span id="box-count" class="note" role="status"></span>
     <button id="sel-start" type="button">複数選択</button>
@@ -150,22 +140,48 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
         <button type="button" role="menuitem" id="cell-delete" class="danger-text">⊖ 削除</button>
       </div>
     </div>
-    <div class="box-actions">
-      <button id="box-import-open" type="button" aria-haspopup="dialog">CSVを読み込む</button>
-      <button id="box-copy" type="button">CSVをコピー</button>
-      <button id="box-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="そのほかの操作">⋯</button>
-    </div>
-    <div id="box-more" class="pop-menu more-menu" role="menu" hidden>
-      <button id="box-rename" type="button" role="menuitem">名前を変える</button>
-      <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
-      <button id="box-restore" type="button" role="menuitem">3へ戻して編集</button>
-      <button id="box-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
-    </div>
     <p class="note">※BOXはこの端末のこのアプリの中だけに保存されます。アプリを消すと中身も消えるので、大事なBOXはCSVで保存してください。</p>
   </section>
 </div>
 </main>
 </div>
+
+<div id="box-bar" class="box-bar" hidden>
+  <button id="filter-open" type="button" class="filter-btn" aria-haspopup="dialog" aria-label="絞り込み・並べ替え">🔍 OFF</button>
+  <button id="box-import-open" type="button" aria-haspopup="dialog">CSVを読み込む</button>
+  <button id="box-copy" type="button">CSVをコピー</button>
+  <button id="box-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="そのほかの操作">⋯</button>
+</div>
+<div id="box-more" class="pop-menu more-menu bar-more" role="menu" hidden>
+  <button id="box-rename" type="button" role="menuitem">名前を変える</button>
+  <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
+  <button id="box-restore" type="button" role="menuitem">3へ戻して編集</button>
+  <button id="box-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
+</div>
+
+<dialog id="filter-dialog" class="modal" aria-labelledby="filter-title">
+  <div class="modal-body">
+    <h3 id="filter-title" tabindex="-1">絞り込み・並べ替え</h3>
+    <label class="field"><span>名前・ニックネーム</span><input id="box-filter" type="search" placeholder="名前で絞り込み" autocomplete="off"></label>
+    <label class="field"><span>食材</span><select id="box-ing" aria-label="食材で絞り込む"></select></label>
+    <div class="field"><span>タイプ(複数選べます。どれかに当てはまる個体)</span><div id="filter-types" class="chips2"></div></div>
+    <div class="field"><span>サブスキル(複数選ぶと、すべて持つ個体)</span><div id="filter-subs" class="chips2"></div></div>
+    <label class="field"><span>並べ替え</span>
+      <select id="box-sort" aria-label="並べ替え">
+        <option value="added">追加順</option>
+        <option value="newest">新しい順</option>
+        <option value="level">レベル順</option>
+        <option value="species">種族名順</option>
+        <option value="type">タイプ順</option>
+      </select>
+    </label>
+    <p id="filter-count" class="note" role="status"></p>
+    <div class="modal-actions">
+      <button id="filter-clear" type="button">解除</button>
+      <button id="filter-close" type="button" class="primary">閉じる</button>
+    </div>
+  </div>
+</dialog>
 
 <div id="sel-bar" class="sel-bar" hidden>
   <p id="sel-msg" class="box-warn" role="status"></p>

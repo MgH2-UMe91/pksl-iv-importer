@@ -5,6 +5,8 @@
 取得物のフォルダに置くもの:
   nerolis-lab/nerolis-lab (Apache-2.0) の common/src/types/pokemon/ から
     all-pokemon.ts, berry-pokemon.ts, ingredient-pokemon.ts, skill-pokemon.ts
+    (タイプは、ポケモンのきのみ(berry)のタイプ。きのみは common/src/types/berry/berries.ts)
+  nerolis-lab/nerolis-lab (Apache-2.0) の common/src/types/berry/berries.ts
   PokeAPI/pokeapi (BSD-3-Clause) の data/v2/csv/pokemon_species_names.csv
 """
 import csv
@@ -67,6 +69,11 @@ FORMS = {
     'TOXTRICITY_LOW_KEY': 'ストリンダー(ロー)',
 }
 
+# きのみ -> タイプ(ポケモンスリープのタイプは、そのポケモンのきのみのタイプ)
+BERRY_TYPE = dict(re.findall(r"export const ([A-Z0-9_]+): Berry = \{\s*name: '[A-Z0-9_]+',\s*value: \d+,\s*type: '([a-z]+)'", (SRC / 'berries.ts').read_text(encoding='utf-8')))
+if len(BERRY_TYPE) != 18:
+    raise SystemExit(f'きのみのタイプが18件ではありません: {len(BERRY_TYPE)}')
+
 names = {}
 with open(SRC / 'pokemon_species_names.csv', encoding='utf-8') as f:
     for row in csv.DictReader(f):
@@ -88,6 +95,9 @@ for fn in ['all-pokemon.ts', 'berry-pokemon.ts', 'ingredient-pokemon.ts', 'skill
             m['ing'] = [x for x in ab.groups() if x]
         if 'ingredient0:' in body:
             m['myth'] = sorted({x for x in re.findall(r'ingredient: (\w+)', body) if x in ING}, key=list(ING).index)
+        bk = re.search(r'berry: ([A-Z0-9_]+)', body)
+        if bk:
+            m['berry'] = bk.group(1)
         sk = re.search(r'skill: (\w+)', body)
         if sk:
             m['skill'] = sk.group(1)
@@ -121,6 +131,10 @@ for const in order:
             raise SystemExit(f'食材なし {const}')
         row['ing'] = [ING[x] for x in ing]
         row['amt'] = amounts(ing, m['factor'])
+    berry = inherit(m, 'berry')
+    if berry not in BERRY_TYPE:
+        raise SystemExit(f'きのみのタイプなし {const} {berry}')
+    row['type'] = BERRY_TYPE[berry]
     if inherit(m, 'skill') == 'Versatile':
         row['versatile'] = True
     rows.append(row)

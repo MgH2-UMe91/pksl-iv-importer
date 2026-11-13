@@ -10,6 +10,8 @@ const BoxUi = (() => {
   let onlyFlag = false;  // 要確認の個体だけを表示しているか
   let selected = null;   // 箱をタップして、メニューを出している個体の番号
   let selectMode = false; // 複数選択のモードか
+  let typesSel = new Set(); // タイプの絞り込み(タイプの英語名)
+  let subsSel = new Set();  // サブスキルの絞り込み(名前)
   let picked = new Set(); // 複数選択で選んでいる個体の番号
   let sheet = null;      // 開いている編集画面 { idx, row, order, timer }
   let savedSig = '';     // 最後に保存した(または戻した)ときの 3 の中身。違えば「保存していない行がある」
@@ -27,7 +29,8 @@ const BoxUi = (() => {
     g('tab-box').setAttribute('aria-selected', String(box));
     g('pane-import').hidden = box;
     g('pane-box').hidden = !box;
-    g('box-top').hidden = !(box && enabled()); // 上部の固定部分(BOX の切り替え・絞り込み・複数選択)は BOX タブのときだけ
+    g('box-top').hidden = !(box && enabled()); // 上部の固定部分(BOX の切り替え・複数選択)は BOX タブのときだけ
+    g('box-bar').hidden = !(box && enabled()); // 下の固定バーも同じ
     if (remember) Box.saveTab(name);
     if (!box) endSelect();
     if (box) renderAll();
@@ -91,7 +94,9 @@ const BoxUi = (() => {
   }
 
   // 全匹をスクロールで見せる(ページ分けはしない)
-  const viewOpts = () => ({ query: g('box-filter').value, ingredient: g('box-ing').value, onlyFlag, sort: g('box-sort').value, page: 0, pageSize: 1e9 });
+  const viewOpts = () => ({ query: g('box-filter').value, ingredient: g('box-ing').value, types: [...typesSel], subs: [...subsSel], onlyFlag, sort: g('box-sort').value, page: 0, pageSize: 1e9 });
+  // 絞り込みがかかっているか(並べ替えは含めない)
+  const isFiltering = () => !!(g('box-filter').value.trim() || g('box-ing').value || typesSel.size || subsSel.size || onlyFlag);
   const label = (a) => `${a[1] || '(種族なし)'}${a[0] ? `(${a[0]})` : ''}`;
 
   function cellHtml({ a, i, flag }) {
@@ -115,12 +120,16 @@ const BoxUi = (() => {
     fb.textContent = onlyFlag
       ? `オレンジ枠の${flagged}匹だけを表示中です。押すと、すべての個体の表示に戻ります。`
       : `確認が必要な個体が${flagged}匹あります。押すと、その個体だけを表示します。直すまで、CSVのコピー・保存(ファイル)はできません。`;
-    const filtering = g('box-filter').value.trim() || g('box-ing').value || onlyFlag;
-    g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${total}匹のうち${v.count}匹を表示` : `${total}匹`)
+    const filtering = isFiltering();
+    g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${v.total}匹中${v.count}匹を表示` : `${total}匹`)
       + (data.broken ? '(一部を読めませんでした)' : '');
     for (const id of ['box-restore', 'box-clear']) g(id).disabled = total === 0;
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
     g('sel-start').disabled = total === 0;
+    const fb2 = g('filter-open');
+    fb2.textContent = filtering ? '🔍 ON' : '🔍 OFF';
+    fb2.classList.toggle('on', filtering);
+    g('filter-count').textContent = filtering ? `${v.total}匹中${v.count}匹を表示します。` : `${total}匹すべてを表示します。`;
     updateSelUi();
     placeCellMenu();
   }
@@ -133,6 +142,7 @@ const BoxUi = (() => {
     g('box-app').hidden = !on;
     g('box-browser-note2').hidden = on;
     g('box-top').hidden = !(on && !g('pane-box').hidden);
+    g('box-bar').hidden = !(on && !g('pane-box').hidden);
     if (!on) return;
     renderTabs();
     renderGrid();
@@ -612,7 +622,59 @@ const BoxUi = (() => {
     g('box-import-done').textContent = done; // 結果は箱の並びの上に出す
   }
 
+  // ---------- 絞り込み・並べ替えのパネル ----------
+  const filterDlg = () => g('filter-dialog');
+  function openFilter() {
+    closeMenus();
+    document.documentElement.classList.add('modal-open');
+    if (typeof filterDlg().showModal === 'function') filterDlg().showModal(); else filterDlg().setAttribute('open', '');
+    g('filter-title').focus({ preventScroll: true }); // 検索欄にフォーカスを当てない(キーボードを出さない)
+  }
+  function closeFilter() {
+    if (typeof filterDlg().close === 'function' && filterDlg().open) filterDlg().close(); else filterDlg().removeAttribute('open');
+    document.documentElement.classList.remove('modal-open');
+  }
+  // 絞り込みをすべて外す(並べ替えは追加順に戻す)
+  function clearFilter() {
+    g('box-filter').value = '';
+    g('box-ing').value = '';
+    g('box-sort').value = 'added';
+    typesSel = new Set();
+    subsSel = new Set();
+    onlyFlag = false;
+    renderChips();
+    firstPage();
+  }
+  function renderChips() {
+    for (const c of g('filter-types').children) c.setAttribute('aria-pressed', String(typesSel.has(c.dataset.type)));
+    for (const c of g('filter-subs').children) c.setAttribute('aria-pressed', String(subsSel.has(c.dataset.sub)));
+  }
+  // タイプ・サブスキル(白・青・金の順)の選択肢を作る
+  function buildChips() {
+    g('filter-types').innerHTML = POKEMON_TYPES.map(([k, label]) => `<button type="button" class="chip" data-type="${k}" aria-pressed="false">${esc(label)}</button>`).join('');
+    g('filter-subs').innerHTML = ['white', 'blue', 'gold'].flatMap((color) => SUBSKILL_COLORS[color].map((name) => `<button type="button" class="chip ${color}" data-sub="${esc(name)}" aria-pressed="false">${esc(name)}</button>`)).join('');
+  }
+
   function init() {
+    buildChips();
+    g('filter-open').addEventListener('click', openFilter);
+    g('filter-close').addEventListener('click', closeFilter);
+    g('filter-clear').addEventListener('click', clearFilter);
+    g('filter-dialog').addEventListener('click', (ev) => { if (ev.target === g('filter-dialog')) closeFilter(); });
+    g('filter-dialog').addEventListener('cancel', () => document.documentElement.classList.remove('modal-open'));
+    g('filter-dialog').addEventListener('close', () => document.documentElement.classList.remove('modal-open'));
+    g('filter-types').addEventListener('click', (ev) => {
+      const c = ev.target.closest('[data-type]');
+      if (!c) return;
+      typesSel = typesSel.has(c.dataset.type) ? new Set([...typesSel].filter((x) => x !== c.dataset.type)) : new Set([...typesSel, c.dataset.type]);
+      renderChips(); firstPage();
+    });
+    g('filter-subs').addEventListener('click', (ev) => {
+      const c = ev.target.closest('[data-sub]');
+      if (!c) return;
+      subsSel = subsSel.has(c.dataset.sub) ? new Set([...subsSel].filter((x) => x !== c.dataset.sub)) : new Set([...subsSel, c.dataset.sub]);
+      renderChips(); firstPage();
+    });
     // 上のタブ
     g('tab-import').addEventListener('click', () => setTab('import'));
     g('tab-box').addEventListener('click', () => setTab('box'));
@@ -673,12 +735,6 @@ const BoxUi = (() => {
       closeMenus();
       g('box-more').hidden = !open;
       g('box-more-btn').setAttribute('aria-expanded', String(open));
-      if (open) {
-        const b = g('box-more-btn');
-        const m = g('box-more');
-        m.style.top = `${b.offsetTop + b.offsetHeight + 4}px`;
-        m.style.right = `${Math.max(0, b.offsetParent.clientWidth - (b.offsetLeft + b.offsetWidth))}px`;
-      }
     });
     g('box-rename').addEventListener('click', () => { closeMenus(); rename(); });
     g('box-file').addEventListener('click', () => { closeMenus(); file(); });

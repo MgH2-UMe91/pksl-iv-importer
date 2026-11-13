@@ -75,20 +75,29 @@ const Box = (() => {
   const PAGE_SIZE = 40; // 4列の箱の、4の倍数
   // 5 のリストに出す個体を決める。opts: { query, ingredient, onlyFlag, sort, page(0始まり) }
   // 返す値: { items: [{ a, i, flag }](このページ), count(絞り込み後の匹数), pages, page, flagged(BOX全体の要確認の数) }
+  // 種族名 -> タイプ(data/pokemon.js)。データにない名前は undefined
+  let typeMap = null;
+  const typeOf = (name) => { if (!typeMap) typeMap = new Map(POKEMON.map((p) => [p.name, p.type])); return typeMap.get(name); };
+  const TYPE_ORDER = POKEMON_TYPES.map((t) => t[0]);
+  const typeRank = (name) => { const i = TYPE_ORDER.indexOf(typeOf(name)); return i < 0 ? 99 : i; };
+
   function view(rows, opts = {}) {
     const q = Match.fold(String(opts.query ?? '').trim());
     const all = rows.map((a, i) => ({ a, i, flag: needsCheck(a) }));
     const flagged = all.filter((x) => x.flag).length;
     const items = all.filter((x) => (!q || Match.fold(`${x.a[1]} ${x.a[0]}`).includes(q))
       && (!opts.ingredient || x.a[4].includes(opts.ingredient))
+      && (!opts.types || !opts.types.length || opts.types.includes(typeOf(x.a[1]))) // 選んだタイプのどれか
+      && (!opts.subs || !opts.subs.length || opts.subs.every((s) => x.a[6].includes(s))) // 選んだサブスキルをすべて持つ
       && (!opts.onlyFlag || x.flag));
     if (opts.sort === 'newest') items.reverse();
     else if (opts.sort === 'species') items.sort((x, y) => String(x.a[1]).localeCompare(String(y.a[1]), 'ja') || x.i - y.i);
+    else if (opts.sort === 'type') items.sort((x, y) => typeRank(x.a[1]) - typeRank(y.a[1]) || String(x.a[1]).localeCompare(String(y.a[1]), 'ja') || x.i - y.i);
     else if (opts.sort === 'level') items.sort((x, y) => (y.a[2] ?? 0) - (x.a[2] ?? 0) || x.i - y.i);
     const size = opts.pageSize ?? PAGE_SIZE; // 画面は全匹をスクロールで見せるので、大きな値を渡す
     const pages = Math.max(1, Math.ceil(items.length / size));
     const page = Math.min(Math.max(0, opts.page ?? 0), pages - 1);
-    return { items: items.slice(page * size, (page + 1) * size), order: items.map((x) => x.i), count: items.length, pages, page, flagged };
+    return { items: items.slice(page * size, (page + 1) * size), total: rows.length, order: items.map((x) => x.i), count: items.length, pages, page, flagged };
   }
 
   // クリップボードから読めなかった・空だったときの案内。読めたなら ''
@@ -155,5 +164,5 @@ const Box = (() => {
 
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, canMove, bulkApply, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, typeOf, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, canMove, bulkApply, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
 })();

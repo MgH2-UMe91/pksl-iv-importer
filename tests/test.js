@@ -366,6 +366,45 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('一括編集: 名前・食材・性格・サブスキルは変わらない', (() => { const b = Box.bulkApply([base], [0], { level: 55, ribbon: 0 })[0]; return [b[0], b[1], b[4], b[5], b[6]]; })(), [base[0], base[1], base[4], base[5], base[6]]);
 }
 
+// タイプ・サブスキルの絞り込みと並べ替え
+{
+  const spOf = (types) => POKEMON.filter((p) => types.includes(p.type));
+  const pika = POKEMON.find((p) => p.name === 'ピカチュウ');
+  const mk = (species, i, sub = ['', '', '', '', '']) => Box.pack(row({ nickname: `n${i}`, species, sub }));
+  eq('全種族にタイプがある(18種のどれか)', POKEMON.every((p) => POKEMON_TYPES.some((t) => t[0] === p.type)), true);
+  eq('タイプは18種', POKEMON_TYPES.length, 18);
+  eq('ピカチュウはでんき', Box.typeOf('ピカチュウ'), 'electric');
+  eq('データにない名前のタイプは undefined', Box.typeOf('ふしぎ'), undefined);
+
+  const fire = POKEMON.find((p) => p.type === 'fire').name, water = POKEMON.find((p) => p.type === 'water').name, elec = pika.name;
+  const rows = [mk(fire, 0), mk(water, 1), mk(elec, 2), mk(fire, 3), mk('ふしぎ', 4)];
+  eq('タイプで絞り込む(1つ)', Box.view(rows, { types: ['fire'] }).items.map((x) => x.i), [0, 3]);
+  eq('タイプで絞り込む(複数はどれか)', Box.view(rows, { types: ['fire', 'water'] }).items.map((x) => x.i), [0, 1, 3]);
+  eq('タイプを選ぶと、タイプ不明の個体は出ない', Box.view(rows, { types: ['fire', 'water', 'electric'] }).items.map((x) => x.i).includes(4), false);
+  eq('タイプを選ばなければ全員', Box.view(rows, { types: [] }).count, 5);
+
+  const s1 = 'おてつだいスピードM', s2 = 'きのみの数S', s3 = '食材確率アップM';
+  const subRows = [mk(fire, 0, [s1, s2, '', '', '']), mk(fire, 1, [s1, '', '', '', '']), mk(fire, 2, [s2, s3, s1, '', '']), mk(fire, 3)];
+  eq('サブスキル: 1つを持つ個体', Box.view(subRows, { subs: [s1] }).items.map((x) => x.i), [0, 1, 2]);
+  eq('サブスキル: 複数を選んだら、すべて持つ個体だけ', Box.view(subRows, { subs: [s1, s2] }).items.map((x) => x.i), [0, 2]);
+  eq('サブスキル: 3つすべて持つ個体', Box.view(subRows, { subs: [s1, s2, s3] }).items.map((x) => x.i), [2]);
+  eq('サブスキル: 持たない組み合わせは0匹', Box.view(subRows, { subs: [s3, s1, s2, 'ゆめのかけらボーナス'] }).count, 0);
+
+  eq('タイプとサブスキルは両方かかる', Box.view([mk(fire, 0, [s1, '', '', '', '']), mk(water, 1, [s1, '', '', '', '']), mk(fire, 2)], { types: ['fire'], subs: [s1] }).items.map((x) => x.i), [0]);
+  eq('名前・食材・タイプ・サブスキルは重ねて絞り込める', Box.view([mk(fire, 0, [s1, '', '', '', '']), mk(fire, 1, [s1, '', '', '', ''])], { types: ['fire'], subs: [s1], query: 'n1' }).items.map((x) => x.i), [1]);
+
+  const sorted = Box.view([mk(elec, 0), mk(water, 1), mk(fire, 2), mk('ふしぎ', 3)], { sort: 'type' }).items.map((x) => x.i);
+  eq('タイプ順: ノーマル→ほのお→みず→でんき…の順で、タイプ不明は最後', sorted, [2, 1, 0, 3]);
+  eq('タイプ順: 同じタイプは種族名順', (() => { const [a, b] = spOf(['water']).slice(0, 2).map((p) => p.name).sort((x, y) => x.localeCompare(y, 'ja')); return Box.view([mk(b, 0), mk(a, 1)], { sort: 'type' }).items.map((x) => x.a[1]); })().join() === spOf(['water']).slice(0, 2).map((p) => p.name).sort((x, y) => x.localeCompare(y, 'ja')).join(), true);
+  eq('追加順・新しい順・レベル順・種族名順は今までどおり', [Box.view(rows, { sort: 'added' }).items[0].i, Box.view(rows, { sort: 'newest' }).items[0].i], [0, 4]);
+
+  eq('絞り込みを解除すると(条件なし)全員が戻る', Box.view(rows, {}).count, 5);
+  const f = Box.view(rows, { types: ['fire'] });
+  eq('絞り込み中の件数: 全体の匹数と、表示する匹数', [f.total, f.count], [5, 2]);
+  eq('絞り込みなしでも全体の匹数を返す', Box.view(rows, {}).total, 5);
+  eq('絞り込み中でも、要確認の数はBOX全体で数える', (() => { const arr = [mk(fire, 0), mk('ふしぎ', 1), mk(water, 2)]; return Box.view(arr, { types: ['fire'] }).flagged === arr.filter(Box.needsCheck).length; })(), true);
+}
+
 // CSV・TSV の読み込み
 {
   const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });

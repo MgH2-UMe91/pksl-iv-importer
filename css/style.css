@@ -495,3 +495,27 @@ html.selecting #box-app { padding-bottom: 120px; }
 .sel-bar-btns button { min-height: 44px; padding: 4px 2px; font-size: 0.85rem; }
 .modal-body label.field { display: block; }
 .modal-body label.field select, .modal-body label.field input { width: 100%; }
+
+/* ====== 下の固定バーと、絞り込み・並べ替えのパネル ====== */
+:root { --bar-h: calc(58px + env(safe-area-inset-bottom, 0px)); }
+.box-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; gap: 6px; align-items: center; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15); }
+.box-bar button { min-height: 44px; padding: 4px 8px; font-size: 0.9rem; }
+.box-bar #box-import-open, .box-bar #box-copy { flex: 1 1 auto; }
+.box-bar #box-more-btn { flex: 0 0 48px; padding: 0; }
+.box-bar .filter-btn { flex: 0 0 auto; min-width: 84px; font-weight: 700; }
+.box-bar .filter-btn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.bar-more { position: fixed; right: 8px; bottom: calc(var(--bar-h) + 4px); z-index: 40; }
+#box-app { padding-bottom: calc(var(--bar-h) + 16px); }
+html.selecting #box-app { padding-bottom: calc(var(--bar-h) + 150px); }
+.sel-bar { bottom: var(--bar-h); }
+.chips2 { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { min-height: 34px; padding: 2px 10px; border-radius: 17px; font-size: 0.88rem; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.chip.blue { background: var(--blue); border-color: var(--blue-line); color: var(--text); }
+.chip.gold { background: var(--gold); border-color: var(--gold-line); color: var(--text); }
+.chip.blue[aria-pressed="true"], .chip.gold[aria-pressed="true"], .chip.white[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 1px; }
+.chip.white[aria-pressed="true"] { background: var(--card); color: var(--text); border-color: var(--accent); }
+.chip[aria-pressed="true"]::before { content: "✓ "; }
+.modal-body .field > span { margin-bottom: 2px; }
+#filter-dialog .modal-actions { position: sticky; bottom: 0; background: var(--card); padding: 8px 0 2px; border-top: 1px solid var(--line); }
+#filter-dialog .modal-body { padding-bottom: 8px; }

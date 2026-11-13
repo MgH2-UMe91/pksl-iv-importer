@@ -31,7 +31,7 @@
 
 | 対象 | 出どころ | ライセンス |
 | --- | --- | --- |
-| `data/pokemon.js` の種族と食材 | [nerolis-lab](https://github.com/nerolis-lab/nerolis-lab) | Apache-2.0 |
+| `data/pokemon.js` の種族・食材・タイプ(タイプはポケモンのきのみのタイプ) | [nerolis-lab](https://github.com/nerolis-lab/nerolis-lab) | Apache-2.0 |
 | `data/pokemon.js` の日本語の種族名 | [PokeAPI](https://github.com/PokeAPI/pokeapi) | BSD-3-Clause |
 | `vendor/` | [Tesseract.js](https://github.com/naptha/tesseract.js) と学習データ | Apache-2.0(`vendor/README.txt`) |
 
