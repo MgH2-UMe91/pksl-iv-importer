@@ -7,9 +7,10 @@ const BoxUi = (() => {
   let boxes = [Box.load(1), Box.load(2)];
   let active = 1;        // BOX タブで見ている BOX
   let restoredFrom = 0;  // 3 へ戻した元の BOX(0 なら戻していない)
-  let page = 0;          // 箱の並びのページ(0始まり)。絞り込み・並べ替え・BOX の切り替えで1ページ目に戻る
   let onlyFlag = false;  // 要確認の個体だけを表示しているか
   let selected = null;   // 箱をタップして、メニューを出している個体の番号
+  let selectMode = false; // 複数選択のモードか
+  let picked = new Set(); // 複数選択で選んでいる個体の番号
   let sheet = null;      // 開いている編集画面 { idx, row, order, timer }
   let savedSig = '';     // 最後に保存した(または戻した)ときの 3 の中身。違えば「保存していない行がある」
   const enabled = () => Install.standalone();
@@ -26,7 +27,9 @@ const BoxUi = (() => {
     g('tab-box').setAttribute('aria-selected', String(box));
     g('pane-import').hidden = box;
     g('pane-box').hidden = !box;
+    g('box-top').hidden = !(box && enabled()); // 上部の固定部分(BOX の切り替え・絞り込み・複数選択)は BOX タブのときだけ
     if (remember) Box.saveTab(name);
+    if (!box) endSelect();
     if (box) renderAll();
     closeMenus();
   }
@@ -87,18 +90,24 @@ const BoxUi = (() => {
     g('box-tabs').innerHTML = [1, 2].map((n) => `<button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}">${esc(nameOf(n))} <small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button>`).join('');
   }
 
-  const viewOpts = () => ({ query: g('box-filter').value, ingredient: g('box-ing').value, onlyFlag, sort: g('box-sort').value, page });
+  // 全匹をスクロールで見せる(ページ分けはしない)
+  const viewOpts = () => ({ query: g('box-filter').value, ingredient: g('box-ing').value, onlyFlag, sort: g('box-sort').value, page: 0, pageSize: 1e9 });
   const label = (a) => `${a[1] || '(種族なし)'}${a[0] ? `(${a[0]})` : ''}`;
+
+  function cellHtml({ a, i, flag }) {
+    const ings = a[4].map((n) => (n ? `<span class="ico xs" title="${esc(n)}">${INGREDIENT_ICONS[n] ?? ''}</span>` : '<span class="ico xs none">−</span>')).join('');
+    const nm = Box.splitName(a[1] || '(未設定)');
+    const cls = `cell${flag ? ' flag' : ''}${!selectMode && selected === i ? ' sel' : ''}${selectMode && picked.has(i) ? ' chk' : ''}`;
+    // 上から: 種族名の最初の6文字 / 7文字目以降と Lv / 食材3つ / ニックネーム
+    return `<button type="button" class="${cls}" data-i="${i}" aria-label="${esc(label(a))}、Lv${a[2] ?? '?'}"><b class="c-n1">${esc(nm.first)}</b><span class="c-row2"><b class="c-n2">${esc(nm.rest)}</b><span class="c-lv"><i>Lv</i>${a[2] ?? '?'}</span></span><span class="c-ing">${ings}</span><span class="c-nick">${esc(a[0]) || '&nbsp;'}</span></button>`;
+  }
 
   function renderGrid() {
     const data = boxes[active - 1];
     const v = Box.view(data.rows, viewOpts());
-    page = v.page;
     if (onlyFlag && !v.flagged) onlyFlag = false; // 要確認がなくなったら、絞り込みを外す
-    g('box-grid').innerHTML = v.items.map(({ a, i, flag }) => {
-      const ings = a[4].map((n) => (n ? `<span class="ico xs" title="${esc(n)}">${INGREDIENT_ICONS[n] ?? ''}</span>` : '<span class="ico xs none">−</span>')).join('');
-      return `<button type="button" class="cell${flag ? ' flag' : ''}${selected === i ? ' sel' : ''}" data-i="${i}" aria-label="${esc(label(a))}、Lv${a[2] ?? '?'}"><span class="c-lv"><i>Lv.</i>${a[2] ?? '?'}</span><b class="c-name">${esc(a[1] || '(未設定)')}</b><span class="c-nick">${esc(a[0]) || '&nbsp;'}</span><span class="c-ing">${ings}</span></button>`;
-    }).join('');
+    picked = new Set([...picked].filter((i) => i < data.rows.length));
+    g('box-grid').innerHTML = v.items.map(cellHtml).join('');
     const total = data.rows.length;
     const flagged = v.flagged; // 辞書にない値などで、出力できない個体
     const fb = g('box-flag');
@@ -107,26 +116,23 @@ const BoxUi = (() => {
       ? `オレンジ枠の${flagged}匹だけを表示中です。押すと、すべての個体の表示に戻ります。`
       : `確認が必要な個体が${flagged}匹あります。押すと、その個体だけを表示します。直すまで、CSVのコピー・保存(ファイル)はできません。`;
     const filtering = g('box-filter').value.trim() || g('box-ing').value || onlyFlag;
-    g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${total}匹のうち${v.count}匹を表示しています。` : `${total}匹`)
-      + (data.broken ? ' 保存の中身の一部を読めなかったため、読めた分だけを出しています。' : '');
-    // ページ送り(1ページ40匹)。1ページに収まるときは出さない
-    for (const id of ['box-pager-top', 'box-pager-bottom']) {
-      const el = g(id);
-      el.hidden = v.pages <= 1;
-      el.innerHTML = `<button type="button" data-page="${v.page - 1}"${v.page === 0 ? ' disabled' : ''}>‹ 前へ</button><span>${v.page + 1}/${v.pages}</span><button type="button" data-page="${v.page + 1}"${v.page >= v.pages - 1 ? ' disabled' : ''}>次へ ›</button>`;
-    }
+    g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${total}匹のうち${v.count}匹を表示` : `${total}匹`)
+      + (data.broken ? '(一部を読めませんでした)' : '');
     for (const id of ['box-restore', 'box-clear']) g(id).disabled = total === 0;
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
+    g('sel-start').disabled = total === 0;
+    updateSelUi();
     placeCellMenu();
   }
 
-  // 絞り込み・並べ替えを変えたら1ページ目に戻る
-  const firstPage = () => { page = 0; selected = null; renderGrid(); };
+  // 絞り込み・並べ替えを変えたら、選んでいる箱のメニューを閉じる
+  const firstPage = () => { selected = null; renderGrid(); };
 
   function renderAll() {
     const on = enabled();
     g('box-app').hidden = !on;
     g('box-browser-note2').hidden = on;
+    g('box-top').hidden = !(on && !g('pane-box').hidden);
     if (!on) return;
     renderTabs();
     renderGrid();
@@ -299,12 +305,13 @@ const BoxUi = (() => {
     if (!sheet) return;
     persist();
     extraRows.delete(sheet.row.id);
-    const idx = sheet.idx, order = sheet.order;
+    const idx = sheet.idx;
     sheet = null;
     document.documentElement.classList.remove('modal-open');
-    page = Box.pageOf(order, idx);
     renderAll();
     renderSave(okNow());
+    const cell = g('box-grid').querySelector(`.cell[data-i="${idx}"]`);
+    if (cell) cell.scrollIntoView({ block: 'center' }); // 直した個体の箱が見える位置へ
   }
 
   function closeSheet() {
@@ -313,39 +320,43 @@ const BoxUi = (() => {
     finishSheet();
   }
 
-  // ---------- 確認などの欄 ----------
-  // buttons: [{ label, cls, fn }]
-  function ask(html, buttons) {
-    const el = g('box-confirm');
-    el.hidden = false;
-    el.innerHTML = `<p>${html}</p><div class="actions"></div>`;
+  // ---------- 確認など(画面の中央のダイアログ) ----------
+  // buttons: [{ label, cls, fn }]。押すと先に閉じてから fn を呼ぶ
+  function ask(html, buttons, focusId = '') {
+    g('ask-msg').innerHTML = html;
+    const box = g('ask-actions');
+    box.innerHTML = '';
     for (const b of buttons) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = b.label;
       if (b.cls) btn.className = b.cls;
       btn.addEventListener('click', () => { closeAsk(); if (b.fn) b.fn(); });
-      el.lastChild.append(btn);
+      box.append(btn);
     }
-    el.scrollIntoView({ block: 'nearest' });
+    document.documentElement.classList.add('modal-open');
+    const d = g('ask-dialog');
+    if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+    (focusId ? g(focusId) : g('ask-msg')).focus({ preventScroll: true }); // 入力が要るとき以外は、キーボードを出さない
   }
-  const closeAsk = () => { g('box-confirm').hidden = true; g('box-confirm').innerHTML = ''; };
+  function closeAsk() {
+    const d = g('ask-dialog');
+    if (typeof d.close === 'function' && d.open) d.close(); else d.removeAttribute('open');
+    document.documentElement.classList.remove('modal-open');
+  }
 
   function rename() {
-    const el = g('box-confirm');
-    el.hidden = false;
-    el.innerHTML = `<label class="field"><span>BOXの名前(全角${Box.NAME_MAX}文字まで。空にすると「${esc(Box.defaultName(active))}」に戻ります)</span><input id="box-name" type="text" maxlength="${Box.NAME_MAX}" value="${esc(boxes[active - 1].name)}" placeholder="${esc(Box.defaultName(active))}" autocomplete="off"></label><div class="actions"><button type="button" id="box-name-ok" class="primary">決定</button><button type="button" id="box-name-cancel">やめる</button></div>`;
-    g('box-name').focus();
-    g('box-name-cancel').onclick = closeAsk;
-    g('box-name-ok').onclick = () => {
-      const data = boxes[active - 1];
-      data.name = Box.cleanName(g('box-name').value);
-      Box.save(active, data);
-      boxes[active - 1] = Box.load(active);
-      closeAsk();
-      renderAll();
-      renderSave(okNow());
-    };
+    ask(`<label class="field"><span>BOXの名前(全角${Box.NAME_MAX}文字まで。空にすると「${esc(Box.defaultName(active))}」に戻ります)</span><input id="box-name" type="text" maxlength="${Box.NAME_MAX}" value="${esc(boxes[active - 1].name)}" placeholder="${esc(Box.defaultName(active))}" autocomplete="off"></label>`, [
+      { label: '決定', cls: 'primary', fn: () => {
+        const data = boxes[active - 1];
+        data.name = Box.cleanName(g('box-name').value);
+        Box.save(active, data);
+        boxes[active - 1] = Box.load(active);
+        renderAll();
+        renderSave(okNow());
+      } },
+      { label: 'やめる' },
+    ], 'box-name');
   }
 
   function restore() {
@@ -366,12 +377,15 @@ const BoxUi = (() => {
     ]);
   }
 
-  async function copy() {
-    const text = Box.csv(boxes[active - 1].rows);
+  async function writeClipboard(text) {
     try { await navigator.clipboard.writeText(text); } catch (e) {
       const ta = document.createElement('textarea');
       ta.value = text; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove();
     }
+  }
+
+  async function copy() {
+    await writeClipboard(Box.csv(boxes[active - 1].rows));
     g('box-copy').textContent = 'コピーしました';
     setTimeout(() => { g('box-copy').textContent = 'CSVをコピー'; }, 1500);
   }
@@ -395,6 +409,144 @@ const BoxUi = (() => {
       } },
       { label: 'やめる' },
     ]);
+  }
+
+  // ---------- 複数選択(選んだ個体を、CSVコピー・BOX移動・一括編集・削除) ----------
+  const pickedRows = () => Box.pick(boxes[active - 1].rows, picked);
+  // 画面下のバーの文。warn が false なら普通の文字の色(成功の知らせ)
+  function selMsg(text, warn = true) {
+    const m = g('sel-msg');
+    m.textContent = text;
+    m.classList.toggle('ok', !warn);
+    updateSelUi();
+  }
+
+  function updateSelUi() {
+    const n = picked.size;
+    g('sel-start').hidden = selectMode;
+    g('box-count').hidden = selectMode;
+    g('sel-tools').hidden = !selectMode;
+    g('sel-count').textContent = `${n}匹選択中`;
+    const hasMsg = !!g('sel-msg').textContent;
+    g('sel-bar').hidden = !(selectMode && (n > 0 || hasMsg));
+    for (const id of ['sel-copy', 'sel-move', 'sel-edit', 'sel-del']) g(id).disabled = n === 0;
+    document.documentElement.classList.toggle('selecting', selectMode && (n > 0 || hasMsg));
+    for (const c of g('box-grid').querySelectorAll('.cell')) {
+      const on = selectMode && picked.has(Number(c.dataset.i));
+      c.classList.toggle('chk', on);
+      c.setAttribute('aria-pressed', selectMode ? String(on) : 'false');
+    }
+  }
+
+  function startSelect() {
+    closeMenus();
+    selectMode = true;
+    picked = new Set();
+    g('sel-msg').textContent = '';
+    updateSelUi();
+  }
+
+  function endSelect() {
+    selectMode = false;
+    picked = new Set();
+    g('sel-msg').textContent = '';
+    updateSelUi();
+  }
+
+  // 選んだ個体だけを、今のCSVの形でコピーする。確認が必要な個体を含むときは、コピーせず理由を出す
+  async function selCopy() {
+    const rows = pickedRows();
+    const bad = rows.filter(Box.needsCheck).length;
+    if (bad) { selMsg(`確認が必要な個体が${bad}匹含まれているので、コピーできません。直してからコピーしてください。`); return; }
+    await writeClipboard(Box.csv(rows));
+    selMsg(`${rows.length}匹をCSVにコピーしました。`, false);
+  }
+
+  // もう一方の BOX へ移す。入りきらなければ移さず、理由を出す。移した個体は元の BOX から消える
+  function selMove() {
+    const from = active, to = 3 - active;
+    const idxs = [...picked];
+    const moving = pickedRows();
+    const plan = Box.canMove(moving.length, boxes[to - 1].rows.length);
+    if (!plan.fits) { selMsg(`${nameOf(to)}にはあと${plan.room}匹しか入りません。${moving.length}匹は入らないので、移せません。`); return; }
+    const dst = boxes[to - 1], src = boxes[from - 1];
+    if (!Box.save(to, { name: dst.name, rows: dst.rows.concat(moving) })) { selMsg('保存できませんでした。端末の空き容量を確かめてください。'); return; }
+    if (!Box.save(from, { name: src.name, rows: Box.removeMany(src.rows, idxs) })) {
+      Box.save(to, { name: dst.name, rows: dst.rows }); // 元に戻す(二重にならないように)
+      selMsg('保存できませんでした。端末の空き容量を確かめてください。');
+      return;
+    }
+    boxes[to - 1] = Box.load(to);
+    boxes[from - 1] = Box.load(from);
+    picked = new Set();
+    renderTabs();
+    renderGrid();
+    renderSave(okNow());
+    selMsg(`${moving.length}匹を${nameOf(to)}へ移しました。`, false);
+  }
+
+  function selDelete() {
+    const n = picked.size;
+    ask(`${n}匹を消しますか？<b class="box-danger">この操作は取り消せません。</b>`, [
+      { label: '消す', cls: 'danger', fn: () => {
+        const data = boxes[active - 1];
+        Box.save(active, { name: data.name, rows: Box.removeMany(data.rows, [...picked]) });
+        boxes[active - 1] = Box.load(active);
+        picked = new Set();
+        renderTabs();
+        renderGrid();
+        renderSave(okNow());
+        selMsg(`${n}匹を消しました。`, false);
+      } },
+      { label: 'やめる' },
+    ]);
+  }
+
+  // 一括編集のダイアログ
+  const bulkDlg = () => g('bulk-dialog');
+  function openBulk() {
+    g('bulk-level').value = '';
+    g('bulk-ribbon').innerHTML = '<option value="">変えない</option>' + RIBBONS.map((h) => `<option value="${h}">${RIBBON_LABELS[h]}</option>`).join('');
+    g('bulk-skill').innerHTML = '<option value="">変えない</option>' + [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}">Lv.${n}</option>`).join('');
+    g('bulk-mint').value = '';
+    g('bulk-shiny').value = '';
+    g('bulk-warn').textContent = '';
+    document.documentElement.classList.add('modal-open');
+    if (typeof bulkDlg().showModal === 'function') bulkDlg().showModal(); else bulkDlg().setAttribute('open', '');
+    g('bulk-title').focus({ preventScroll: true });
+  }
+  function closeBulk() {
+    if (typeof bulkDlg().close === 'function' && bulkDlg().open) bulkDlg().close(); else bulkDlg().removeAttribute('open');
+    document.documentElement.classList.remove('modal-open');
+  }
+  // 「変えない」(空)の項目は changes に入れない
+  function readBulk() {
+    const ch = {};
+    const lv = g('bulk-level').value.trim();
+    if (lv !== '') {
+      const n = Number(lv);
+      if (!Number.isInteger(n) || n < 1 || n > 100) return { error: 'レベルは1〜100で指定してください。' };
+      ch.level = n;
+    }
+    if (g('bulk-ribbon').value !== '') ch.ribbon = Number(g('bulk-ribbon').value);
+    if (g('bulk-skill').value !== '') ch.skillLevel = Number(g('bulk-skill').value);
+    if (g('bulk-mint').value !== '') ch.mint = g('bulk-mint').value === '1';
+    if (g('bulk-shiny').value !== '') ch.shiny = g('bulk-shiny').value === '1';
+    if (!Object.keys(ch).length) return { error: '変える項目を選んでください(すべて「変えない」です)。' };
+    return { ch };
+  }
+  function applyBulk() {
+    const r = readBulk();
+    if (r.error) { g('bulk-warn').textContent = r.error; return; }
+    const n = picked.size;
+    const data = boxes[active - 1];
+    if (!Box.save(active, { name: data.name, rows: Box.bulkApply(data.rows, [...picked], r.ch) })) { g('bulk-warn').textContent = '保存できませんでした。端末の空き容量を確かめてください。'; return; }
+    boxes[active - 1] = Box.load(active);
+    picked = new Set();
+    closeBulk();
+    renderGrid();
+    renderSave(okNow());
+    selMsg(`${n}匹を一括編集しました。`, false);
   }
 
   // ---------- CSV の読み込み(いま見ている BOX へ直接追加する。ダイアログで貼り付ける) ----------
@@ -454,7 +606,7 @@ const BoxUi = (() => {
     const check = r.rows.filter((x) => Box.needsCheck(Box.pack(x))).length;
     const done = `${count}匹を${nameOf(n)}に追加しました。${check ? `うち${check}匹は確認が必要です(オレンジ枠の箱を押して直してください)。` : ''}${r.problems.length ? ` 読めなかった行: ${r.problems.map((x) => `${x.line ? `${x.line}行目: ` : ''}${x.message}`).join(' ')}` : ''}`;
     closeImport(); // 成功したら閉じる(貼り付け欄も空になる)
-    page = 0; onlyFlag = false;
+    onlyFlag = false;
     renderAll();
     renderSave(okNow());
     g('box-import-done').textContent = done; // 結果は箱の並びの上に出す
@@ -472,10 +624,9 @@ const BoxUi = (() => {
       const t = ev.target.closest('[data-tab]');
       if (!t) return;
       active = Number(t.dataset.tab);
-      page = 0;
       onlyFlag = false;
       selected = null;
-      closeAsk();
+      endSelect(); // 選んだ番号は、別の BOX では意味がないので外す
       g('box-import-done').textContent = '';
       renderAll();
     });
@@ -484,24 +635,31 @@ const BoxUi = (() => {
     g('box-ing').addEventListener('change', firstPage);
     g('box-sort').addEventListener('change', firstPage);
     g('box-flag').addEventListener('click', () => { onlyFlag = !onlyFlag; firstPage(); });
-    for (const id of ['box-pager-top', 'box-pager-bottom']) {
-      g(id).addEventListener('click', (ev) => {
-        const b = ev.target.closest('[data-page]');
-        if (!b || b.disabled) return;
-        page = Number(b.dataset.page);
-        selected = null;
-        renderGrid();
-        if (id === 'box-pager-bottom') g('box-tabs').scrollIntoView({ block: 'start' }); // 下で送ったときは、先頭へ戻る
-      });
-    }
     // 箱をタップしたメニュー(編集・削除)
     g('box-grid').addEventListener('click', (ev) => {
       const c = ev.target.closest('.cell');
       if (!c) return;
       ev.stopPropagation();
       const i = Number(c.dataset.i);
+      if (selectMode) { picked = Box.toggleSelection(picked, i); g('sel-msg').textContent = ''; updateSelUi(); return; } // 選ぶ・外すを切り替える(メニューは出さない)
       if (selected === i) closeMenus(); else selectCell(i);
     });
+    // 複数選択
+    g('sel-start').addEventListener('click', startSelect);
+    g('sel-end').addEventListener('click', endSelect);
+    g('sel-all').addEventListener('click', () => { picked = Box.selectAll(Box.view(boxes[active - 1].rows, viewOpts()).order); g('sel-msg').textContent = ''; updateSelUi(); });
+    g('sel-none').addEventListener('click', () => { picked = new Set(); g('sel-msg').textContent = ''; updateSelUi(); });
+    g('sel-copy').addEventListener('click', selCopy);
+    g('sel-move').addEventListener('click', selMove);
+    g('sel-edit').addEventListener('click', openBulk);
+    g('sel-del').addEventListener('click', selDelete);
+    g('bulk-apply').addEventListener('click', applyBulk);
+    g('bulk-close').addEventListener('click', closeBulk);
+    g('bulk-dialog').addEventListener('click', (ev) => { if (ev.target === g('bulk-dialog')) closeBulk(); });
+    g('bulk-dialog').addEventListener('cancel', () => document.documentElement.classList.remove('modal-open'));
+    g('bulk-dialog').addEventListener('close', () => document.documentElement.classList.remove('modal-open'));
+    g('ask-dialog').addEventListener('cancel', () => document.documentElement.classList.remove('modal-open'));
+    g('ask-dialog').addEventListener('close', () => document.documentElement.classList.remove('modal-open'));
     g('cell-edit').addEventListener('click', () => { const i = selected; if (i !== null) openSheet(i); });
     g('cell-delete').addEventListener('click', deleteCell);
     // メニューの外を押すと閉じる
@@ -575,5 +733,5 @@ const BoxUi = (() => {
     renderSave(okNow());
   }
 
-  return { init, renderSave, renderAll, afterEdit, sheetHtml, setTab, _state: () => ({ boxes, active, restoredFrom, savedSig, sheet, selected, page }) };
+  return { init, renderSave, renderAll, afterEdit, sheetHtml, setTab, _state: () => ({ boxes, active, restoredFrom, savedSig, sheet, selected, selectMode, picked }) };
 })();

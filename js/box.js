@@ -85,9 +85,10 @@ const Box = (() => {
     if (opts.sort === 'newest') items.reverse();
     else if (opts.sort === 'species') items.sort((x, y) => String(x.a[1]).localeCompare(String(y.a[1]), 'ja') || x.i - y.i);
     else if (opts.sort === 'level') items.sort((x, y) => (y.a[2] ?? 0) - (x.a[2] ?? 0) || x.i - y.i);
-    const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    const size = opts.pageSize ?? PAGE_SIZE; // 画面は全匹をスクロールで見せるので、大きな値を渡す
+    const pages = Math.max(1, Math.ceil(items.length / size));
     const page = Math.min(Math.max(0, opts.page ?? 0), pages - 1);
-    return { items: items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), order: items.map((x) => x.i), count: items.length, pages, page, flagged };
+    return { items: items.slice(page * size, (page + 1) * size), order: items.map((x) => x.i), count: items.length, pages, page, flagged };
   }
 
   // クリップボードから読めなかった・空だったときの案内。読めたなら ''
@@ -122,7 +123,37 @@ const Box = (() => {
   const loadTab = () => { try { const t = localStorage.getItem(TAB_KEY); return t === 'box' ? 'box' : 'import'; } catch (e) { return 'import'; } };
   const saveTab = (t) => { try { localStorage.setItem(TAB_KEY, t === 'box' ? 'box' : 'import'); } catch (e) { /* 覚えられなくても動く */ } };
 
+  // ---- 箱の表示 ----
+  // 種族名を、1行目(最初の6文字)と2行目(7文字目以降)に分ける。かなは全角幅なので、1行に6文字が入る大きさにしてある
+  const splitName = (name, first = 6) => { const a = Array.from(String(name ?? '')); return { first: a.slice(0, first).join(''), rest: a.slice(first).join('') }; };
+
+  // ---- 複数選択 ----
+  // 選択(個体の番号の集まり)を切り替える。新しい Set を返し、元は変えない
+  const toggleSelection = (sel, idx) => { const s = new Set(sel); if (s.has(idx)) s.delete(idx); else s.add(idx); return s; };
+  const selectAll = (order) => new Set(order);
+  // 選んだ個体(BOX の並びの順)
+  const pick = (rows, idxs) => [...idxs].filter((i) => Number.isInteger(i) && i >= 0 && i < rows.length).sort((a, b) => a - b).map((i) => rows[i]);
+  // 選んだ個体を除いた並び(残りの順番は変えない)
+  const removeMany = (rows, idxs) => { const s = new Set(idxs); return rows.filter((_, i) => !s.has(i)); };
+  // もう一方の BOX へ移せるか。入りきらなければ、入る数(room)を返して移さない
+  const canMove = (count, dstLength) => { const room = MAX - dstLength; return { fits: count <= room, room }; };
+  // 一括編集。changes に入っている項目だけを、選んだ個体に反映する(入っていない・undefined の項目は変えない)
+  // changes: { level, skillLevel, ribbon, mint, shiny }
+  const bulkApply = (rows, idxs, changes) => {
+    const target = new Set(idxs);
+    return rows.map((a, i) => {
+      if (!target.has(i)) return a;
+      const r = unpack(a);
+      if (changes.level !== undefined) r.level = changes.level;
+      if (changes.skillLevel !== undefined) r.skillLevel = changes.skillLevel;
+      if (changes.ribbon !== undefined) r.ribbon = changes.ribbon;
+      if (changes.mint !== undefined) r.mint = changes.mint;
+      if (changes.shiny !== undefined) r.shiny = changes.shiny;
+      return pack(r);
+    });
+  };
+
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, PAGE_SIZE, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, canMove, bulkApply, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
 })();

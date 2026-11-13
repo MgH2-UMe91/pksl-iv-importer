@@ -321,6 +321,51 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   localStorage.removeItem(Theme.KEY);
 }
 
+// 箱の表示・複数選択・移動・一括編集・まとめて削除
+{
+  eq('種族名: 6文字以内は1行目だけ', [Box.splitName('サーナイト'), Box.splitName('ウェーニバル')], [{ first: 'サーナイト', rest: '' }, { first: 'ウェーニバル', rest: '' }]);
+  eq('種族名: 7文字目以降は2行目', Box.splitName('ピカチュウ(キャプテン)'), { first: 'ピカチュウ(', rest: 'キャプテン)' });
+  eq('種族名: 7文字目からが2行目', Box.splitName('バケッチャ(ちゅうだましゅ)'), { first: 'バケッチャ(', rest: 'ちゅうだましゅ)' });
+  eq('種族名: 空・未設定でも壊れない', [Box.splitName(''), Box.splitName(undefined)], [{ first: '', rest: '' }, { first: '', rest: '' }]);
+
+  const rows = Array.from({ length: 10 }, (_, i) => Box.pack(row({ nickname: `n${i}`, level: 20 + i })));
+  let sel = new Set();
+  sel = Box.toggleSelection(sel, 3); sel = Box.toggleSelection(sel, 7);
+  eq('選択: 箱を押すと選ぶ(2匹)', [...sel].sort(), [3, 7]);
+  eq('選択: もう一度押すと外れる', [...Box.toggleSelection(sel, 3)], [7]);
+  eq('選択: 切り替えは元の選択を変えない', sel.size, 2);
+  eq('選択: 全部選ぶ(並びのすべて)', Box.selectAll([4, 2, 9]).size, 3);
+  eq('選択: 選択を外すと空', new Set().size, 0);
+
+  const picked = Box.pick(rows, [7, 3, 99, -1]);
+  eq('選んだ個体だけを BOX の並びの順に取り出す(範囲外は除く)', picked.map((r) => r[0]), ['n3', 'n7']);
+  eq('選んだ個体だけの CSV(ヘッダーと2行)', Box.csv(picked).trim().split('\n').length, 3);
+  eq('選んだ個体だけの CSV の中身', Box.csv(picked).trim().split('\n').slice(1).map((l) => l.split(',')[0]), ['n3', 'n7']);
+  const withBad = rows.map((r, i) => (i === 3 ? Box.pack(row({ nickname: 'n3', species: 'ふしぎ' })) : r));
+  eq('選んだ中に確認が必要な個体があれば分かる(コピーを止める)', Box.pick(withBad, [3, 7]).filter(Box.needsCheck).length, 1);
+  eq('選んでいない個体が要確認でも、コピーは止めない', Box.pick(withBad, [7, 8]).filter(Box.needsCheck).length, 0);
+
+  eq('BOX移動: 入る(300匹ちょうど)', Box.canMove(50, 250), { fits: true, room: 50 });
+  eq('BOX移動: 入りきらなければ移さず、入る数を返す', Box.canMove(70, 250), { fits: false, room: 50 });
+  const left = Box.removeMany(rows, [3, 7]);
+  eq('BOX移動: 元の BOX から選んだ個体が消え、残りの順番は同じ', [left.length, left.map((r) => r[0])], [8, ['n0', 'n1', 'n2', 'n4', 'n5', 'n6', 'n8', 'n9']]);
+  eq('まとめて削除: 範囲外の番号は何も消さない', Box.removeMany(rows, [99]).length, 10);
+  eq('まとめて削除は元の配列を変えない', rows.length, 10);
+
+  const base = Box.pack(row({ nickname: 'a', level: 40, skillLevel: 3, ribbon: 500, mint: true, shiny: true }));
+  const one = Box.bulkApply([base], [0], {});
+  eq('一括編集: 何も指定しなければ全項目が変わらない', one[0], base);
+  const lv = Box.unpack(Box.bulkApply([base], [0], { level: 70 })[0]);
+  eq('一括編集: レベルだけ変える(ほかは変えない)', [lv.level, lv.skillLevel, lv.ribbon, lv.mint, lv.shiny], [70, 3, 500, true, true]);
+  const all = Box.unpack(Box.bulkApply([base], [0], { level: 10, skillLevel: 6, ribbon: 2000, mint: false, shiny: false })[0]);
+  eq('一括編集: 5項目すべてを変える', [all.level, all.skillLevel, all.ribbon, all.mint, all.shiny], [10, 6, 2000, false, false]);
+  const part = Box.bulkApply(rows, [2, 4], { ribbon: 1000 });
+  eq('一括編集: 選んだ個体だけが変わる(件数と順番はそのまま)', [part.length, part.map((r) => r[9]), part.map((r) => r[0]).join('')], [10, [0, 0, 1000, 0, 1000, 0, 0, 0, 0, 0], 'n0n1n2n3n4n5n6n7n8n9']);
+  eq('一括編集: 元の配列は変えない', rows[2][9], 0);
+  eq('一括編集: ミントを「使わない」(false)に変えられる(「変えない」とは別)', Box.unpack(Box.bulkApply([base], [0], { mint: false })[0]).mint, false);
+  eq('一括編集: 名前・食材・性格・サブスキルは変わらない', (() => { const b = Box.bulkApply([base], [0], { level: 55, ribbon: 0 })[0]; return [b[0], b[1], b[4], b[5], b[6]]; })(), [base[0], base[1], base[4], base[5], base[6]]);
+}
+
 // CSV・TSV の読み込み
 {
   const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });

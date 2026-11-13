@@ -456,3 +456,42 @@ dialog.sheet[open] { display: flex; flex-direction: column; }
 .sheet-nav { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; gap: 28px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--card); }
 .sheet-nav button { width: 52px; height: 52px; min-height: 0; padding: 0; border-radius: 50%; font-size: 1.5rem; line-height: 1; }
 html.modal-open { overflow: hidden; }
+
+/* ====== BOX タブの作り直し2: 上部を固定・5列・全匹をスクロール・複数選択 ====== */
+.sticky-top { position: sticky; top: 0; z-index: 20; background: var(--bg); }
+html.standalone .app { padding-top: 0; }
+html.standalone .sticky-top { padding-top: calc(env(safe-area-inset-top, 0px) + 28px); }
+.box-top { max-width: 860px; margin: 0 auto; padding: 6px 8px 4px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
+.box-top .box-tabs button { min-height: 40px; padding: 4px 8px; }
+.box-top .box-tools { margin-top: 0; }
+.box-top .box-tools input, .box-top .box-tools select { min-height: 38px; }
+.sel-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 34px; }
+.sel-row .note { margin: 0; flex: 1 1 auto; }
+.sel-row button { min-height: 34px; padding: 2px 10px; font-size: 0.88rem; }
+.sel-tools { display: flex; align-items: center; gap: 4px; flex: 1 1 auto; justify-content: flex-end; flex-wrap: wrap; font-size: 0.88rem; }
+#pane-box { margin: 0 -8px; }
+#box-app { background: none; border: 0; padding: 8px 0 12px; margin: 0 auto; max-width: 860px; }
+.box-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; width: 100%; }
+.cell { padding: 2px; gap: 1px; line-height: 1.15; align-items: stretch; }
+.cell.flag { padding: 1px; }
+.cell .c-n1, .cell .c-n2 { font-size: min(10.5px, calc(((100cqw - 16px) / 5 - 6px) / 5.75)); font-weight: 700; letter-spacing: -0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cell .c-n1 { display: block; min-height: 1.15em; }
+.cell .c-row2 { display: flex; align-items: baseline; gap: 2px; min-height: 1.15em; }
+.cell .c-n2 { flex: 1 1 auto; }
+.cell .c-lv { flex: 0 0 auto; margin-left: auto; font-size: 8px; color: var(--muted); }
+.cell .c-lv i { font-style: normal; color: #3ea35a; }
+.cell .c-ing { display: flex; gap: 1px; margin-top: 1px; }
+.cell .c-nick { font-size: 9px; min-height: 1.15em; max-width: 100%; }
+.ico.xs { width: 14px; height: 14px; padding: 1px; }
+.cell.chk { background: var(--accent); border-color: var(--accent); color: var(--accent-text); position: relative; }
+.cell.chk .c-nick, .cell.chk .c-lv { color: var(--accent-text); }
+.cell.chk::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 11px; font-weight: 700; color: var(--accent-text); }
+.box-actions { margin-top: 12px; }
+html.selecting #box-app { padding-bottom: 120px; }
+.sel-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25); }
+.sel-bar .box-warn { margin: 0 0 4px; font-size: 0.82rem; line-height: 1.35; }
+.sel-bar .box-warn:empty { display: none; }
+.sel-bar-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-width: 860px; margin: 0 auto; }
+.sel-bar-btns button { min-height: 44px; padding: 4px 2px; font-size: 0.85rem; }
+.modal-body label.field { display: block; }
+.modal-body label.field select, .modal-body label.field input { width: 100%; }
