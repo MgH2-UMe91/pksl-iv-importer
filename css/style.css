@@ -519,3 +519,10 @@ html.selecting #box-app { padding-bottom: calc(var(--bar-h) + 150px); }
 .modal-body .field > span { margin-bottom: 2px; }
 #filter-dialog .modal-actions { position: sticky; bottom: 0; background: var(--card); padding: 8px 0 2px; border-top: 1px solid var(--line); }
 #filter-dialog .modal-body { padding-bottom: 8px; }
+
+/* ====== BOX の箱: 5列から4列へ(箱が広くなる分、文字とアイコンを大きくする) ====== */
+.box-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cell .c-n1, .cell .c-n2 { font-size: min(12px, calc(((100cqw - 12px) / 4 - 6px) / 5.75)); }
+.cell .c-lv { font-size: 9px; }
+.cell .c-nick { font-size: 10.5px; }
+.ico.xs { width: 16px; height: 16px; }
