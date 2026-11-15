@@ -94,7 +94,7 @@ const BoxUi = (() => {
 
   // ---------- BOX タブ: 箱の並び ----------
   function renderTabs() {
-    g('box-tabs').innerHTML = [1, 2].map((n) => `<button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}">${esc(nameOf(n))} <small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button>`).join('');
+    g('box-tabs').innerHTML = [1, 2].map((n) => `<button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}"><span class="tn">${esc(nameOf(n))}</span><small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button>`).join('');
   }
 
   // 全匹をスクロールで見せる(ページ分けはしない)
