@@ -5,6 +5,11 @@
   https://github.com/nitoyon/pokesleep-tool
   ポケモンの絵ではなく、色の帯と目印の四角だけで作られたアイコンです。MIT License で提供されています。
 
+■ 種族ごとのメインスキル名(data/skills.js)
+  出どころ: nitoyon/pokesleep-tool の src/data/pokemon.json と src/i18n/ja/skills.json
+  取得元のコミット: https://github.com/nitoyon/pokesleep-tool/tree/f900b1a0c0377f7dea81104a8b4ff5acc6205ff2
+  tools/build_skills.js で、種族名をこのアプリの名前に直して写したものです。MIT License で提供されています。
+
 ----------------------------------------------------------------
 
 MIT License
