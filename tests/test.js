@@ -456,6 +456,10 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('絵の特徴がなければ並べ替えない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), feat: null }).ranked, false);
   eq('分岐進化は最終進化の候補を出す(イーブイ)', (() => { const r = Match.guessSpecies(MAIN_SKILLS['イーブイ'], { ...clueOf('イーブイ'), amount: [null, null], s21: null, s31: null, s32: null }); return r.kind; })(), 'choose');
   eq('どれにも合わなければ none', Match.guessSpecies('ありえないスキル名です', { amount: [99, 99], s21: null, s31: null, s32: null }).kind, 'none');
+  eq('きのみの絵の色: 見本そのものなら、そのタイプ', Match.berryType(BERRY_FEAT.poison), 'poison');
+  eq('きのみの絵の色: 見本から遠い・2つの間で迷うなら使わない', [Match.berryType([0, 0, 0]), Match.berryType(null), Match.berryType(BERRY_FEAT.poison.map((v, i) => (v + BERRY_FEAT.fairy[i]) / 2))], ['', '', '']);
+  eq('きのみがどくなら、ほかのタイプの種族を候補から外す(ウパー(パルデア)とウパー)', (() => { const c = { ...clueOf('ウパー(パルデア)'), berry: BERRY_FEAT.poison }; const n = Match.candidates(MAIN_SKILLS['ウパー(パルデア)'], c); return [n.includes('ウパー(パルデア)'), n.includes('ウパー'), n.every((x) => Match.find(x).type === 'poison')]; })(), [true, false, true]);
+  eq('絞って1つも残らないときは、きのみを使わない', (() => { const c = { ...clueOf('フシギダネ'), berry: BERRY_FEAT.fairy }; return Match.candidates(MAIN_SKILLS['フシギダネ'], c).includes('フシギダネ'); })(), true);
   eq('食材の絵の合い具合は、同じ食材の並びなら 0', Match.ingredientFit('フシギダネ', clueOf('フシギダネ').feat), 0);
   eq('特徴がなければ null', Match.ingredientFit('フシギダネ', null), null);
 }

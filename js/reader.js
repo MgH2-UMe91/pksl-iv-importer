@@ -259,6 +259,31 @@ const Reader = (() => {
     return v.map((t) => Math.round((t / n) * 100));
   }
 
+  // きのみの絵の色の特徴(平均色の3つの数)。詳細画面では絵の下半分が名札に隠れるので、見えている上の部分だけを使う。
+  // cx, cy は円の中心、R は円の半径(画素)。取れないときは null
+  function berryFeatureAt(P, cx, cy, R) {
+    const ctx = P.c.getContext('2d', { willReadFrequently: true });
+    const x0 = Math.max(0, Math.round(cx - R)), y0 = Math.max(0, Math.round(cy - R));
+    const d = ctx.getImageData(x0, y0, Math.min(Math.round(2 * R), P.W - x0), Math.min(Math.round(R * 0.8), P.H - y0));
+    const bg = P.px(cx - R * 0.8, cy - R * 0.45);
+    let n = 0;
+    const sum = [0, 0, 0];
+    for (let j = 0; j < d.height; j++) {
+      for (let i = 0; i < d.width; i++) {
+        const dx = x0 + i - cx, dy = y0 + j - cy;
+        if (dx * dx + dy * dy > R * R) continue;
+        const k = (j * d.width + i) * 4;
+        if (Math.abs(d.data[k] - bg[0]) + Math.abs(d.data[k + 1] - bg[1]) + Math.abs(d.data[k + 2] - bg[2]) > 45) {
+          n++; sum[0] += d.data[k]; sum[1] += d.data[k + 1]; sum[2] += d.data[k + 2];
+        }
+      }
+    }
+    return n > 30 ? sum.map((t) => Math.round(t / n)) : null;
+  }
+
+  // 詳細画面のきのみ(1枠目の食材の真上)。位置は食材の絵からの距離で決まる
+  const berryFeature = (P, iy) => berryFeatureAt(P, 0.4946 * P.W, iy - P.W * 0.2074, P.W * 0.052);
+
   async function analyze(img) {
     const P = getPixels(img), { W } = P;
     const loc = locate(P);
@@ -326,6 +351,8 @@ const Reader = (() => {
       s32: similarity(P, icon[1], icon[2], iy - W * 0.04, stripBottom),
       // 2枠目・3枠目の食材の色の特徴(1枠目は名札にかかることがあり、種族で決まるので使わない)
       feat: [icon[1], icon[2]].map((cx) => iconFeature(P, cx, iy + W * 0.005, W * 0.055)),
+      // きのみの絵の色(確かなときだけ、タイプで絞るのに使う)
+      berry: berryFeature(P, iy),
     };
     return res;
   }
@@ -350,5 +377,5 @@ const Reader = (() => {
     } finally { URL.revokeObjectURL(url); }
   }
 
-  return { read, readSkillNameOnly, iconFeature, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
+  return { read, readSkillNameOnly, iconFeature, berryFeatureAt, berryFeature, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
 })();

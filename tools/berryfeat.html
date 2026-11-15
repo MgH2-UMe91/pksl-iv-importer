@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>きのみの見本の作成</title>
+<p>1) ゲームの「リサーチノート」のきのみの一覧のスクショ(iPhone の元の大きさ 1170×2532)を選びます。<br>
+2) 一覧の「???」のきのみ(カゴのみ)は、どくタイプのポケモンの詳細画面のスクショで補います(任意)。<br>
+<code>data/berryfeat.js</code> の中身を出します。画像は端末の外へ送らず、保存もしません。</p>
+<label>一覧 <input type="file" id="note" accept="image/*"></label><br>
+<label>どくタイプの詳細画面 <input type="file" id="poison" accept="image/*"></label><br>
+<textarea id="out" rows="12" cols="80"></textarea>
+<script src="../js/reader.js"></script>
+<script>
+// 一覧の並び(左から右、上から下)と、きのみのタイプ(取得元は nerolis-lab の berries.ts)
+const BERRIES = [['キー', 'normal'], ['ヒメリ', 'fire'], ['オレン', 'water'], ['ウブ', 'electric'], ['ドリ', 'grass'], ['チーゴ', 'ice'], ['クラボ', 'fighting'], ['カゴ', 'poison'], ['フィラ', 'ground'], ['シーヤ', 'flying'], ['マゴ', 'psychic'], ['ラム', 'bug'], ['オボン', 'rock'], ['ブリー', 'ghost'], ['ヤチェ', 'dragon'], ['ウイ', 'dark'], ['ベリブ', 'steel'], ['モモン', 'fairy']];
+const XS = [172, 443, 715, 986], YS = [458, 869, 1279, 1689, 2099];
+const load = (file) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.src = URL.createObjectURL(file); });
+const run = async () => {
+  const note = document.getElementById('note').files[0], poison = document.getElementById('poison').files[0];
+  if (!note) return;
+  const P = Reader.getPixels(await load(note));
+  if (P.W !== 1170) { out.value = '一覧の画像の幅が 1170 ではありません: ' + P.W; return; }
+  const o = {};
+  BERRIES.forEach(([, type], i) => { o[type] = Reader.berryFeatureAt(P, XS[i % 4], YS[Math.floor(i / 4)], 103); });
+  if (poison) {
+    const Q = Reader.getPixels(await load(poison)), loc = Reader.locate(Q);
+    if (!loc) { out.value = 'どくタイプの詳細画面の目印が見つかりません'; return; }
+    o.poison = Reader.berryFeature(Q, loc.skill.a - Q.W * 0.3725 - Q.W * 0.056);
+  }
+  out.value = `// tools/berryfeat.html の生成物。手で直さない。\n// きのみの絵の色の特徴(見えている上の部分の平均色)。ゲームの絵そのものは含まない。\n'use strict';\n\nconst BERRY_FEAT = ${JSON.stringify(o)};\n`;
+};
+document.getElementById('note').addEventListener('change', run);
+document.getElementById('poison').addEventListener('change', run);
+</script></html>

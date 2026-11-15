@@ -213,6 +213,15 @@ const Match = (() => {
     return combos(p.name).map((c) => ({ amt: c.amt, eq21: c.ing[1] === a, eq31: c.ing[2] === a, eq32: c.ing[1] === c.ing[2] }));
   }
 
+  // きのみの絵の色から、きのみのタイプを決める。確かなときだけ返し、少しでも迷うなら '' を返す(外れるくらいなら使わない)。
+  // 一番近い見本まで BERRY_NEAR 以内で、2番目の見本より BERRY_GAP 以上近いこと
+  const BERRY_NEAR = 16, BERRY_GAP = 20;
+  function berryType(feat) {
+    if (typeof BERRY_FEAT === 'undefined' || !feat) return '';
+    const ranked = Object.entries(BERRY_FEAT).filter(([, v]) => v).map(([t, v]) => [t, Math.hypot(feat[0] - v[0], feat[1] - v[1], feat[2] - v[2])]).sort((a, b) => a[1] - b[1]);
+    return ranked.length > 1 && ranked[0][1] <= BERRY_NEAR && ranked[1][1] - ranked[0][1] >= BERRY_GAP ? ranked[0][0] : '';
+  }
+
   // clues は reader の clues({ amount: [2枠目, 3枠目], s21, s31, s32 })。null や不明の値は絞り込みに使わない
   function candidates(skillName, clues) {
     const key = skillOf(skillName);
@@ -220,12 +229,16 @@ const Match = (() => {
     const flag = (v) => (known(v) ? v >= SAME : null);
     const eq21 = flag(clues?.s21), eq31 = flag(clues?.s31), eq32 = flag(clues?.s32);
     const [n2, n3] = clues?.amount ?? [null, null];
-    return POKEMON.filter((p) => {
+    const berry = berryType(clues?.berry);
+    const found = POKEMON.filter((p) => {
       if (p.myth) return false;
       if (key && skillKey(MAIN_SKILLS[p.name]) !== key) return false;
       return sightings(p).some((s) => (!known(n2) || s.amt[1] === n2) && (!known(n3) || s.amt[2] === n3)
         && (eq21 === null || s.eq21 === eq21) && (eq31 === null || s.eq31 === eq31) && (eq32 === null || s.eq32 === eq32));
     }).map((p) => p.name);
+    // きのみのタイプが確かなときだけ絞る。絞って1つも残らなければ、きのみの判定が外れたと見て使わない
+    const byBerry = berry ? found.filter((n) => find(n).type === berry) : found;
+    return byBerry.length ? byBerry : found;
   }
 
 
@@ -356,5 +369,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
+  return { berryType, ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();
