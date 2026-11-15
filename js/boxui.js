@@ -14,7 +14,7 @@ const BoxUi = (() => {
   let subsSel = new Set();  // サブスキルの絞り込み(名前)
   let ingSel = '';          // 食材の絞り込み(食材名。空なら絞らない)
   let nickOnly = false;     // ニックネームをつけた個体だけ
-  let sortKey = 'added';    // 並べ替え
+  let sortKey = 'level';    // 並べ替え
   let reverse = false;      // 並べ替えの向きを逆にしているか(↓ が通常、↑ が逆)
   let picked = new Set(); // 複数選択で選んでいる個体の番号
   let sheet = null;      // 開いている編集画面 { idx, row, order, timer }
@@ -699,7 +699,7 @@ const BoxUi = (() => {
   function clearFilter() {
     g('box-filter').value = '';
     ingSel = '';
-    sortKey = 'added';
+    sortKey = 'level';
     reverse = false;
     nickOnly = false;
     g('filter-nick').checked = false;
