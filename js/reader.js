@@ -234,6 +234,9 @@ const Reader = (() => {
     return c.toDataURL('image/png');
   }
 
+  // メインスキルの名前。枠の左上の文字で、「Lv.1」と同じ高さ
+  const readSkillName = (P, jpn, skill) => ocr(jpn, cropText(P, P.W * 0.25, skill.b + P.W * 0.1277 - P.W * 0.03, P.W * 0.8, skill.b + P.W * 0.1277 + P.W * 0.03));
+
   async function analyze(img) {
     const P = getPixels(img), { W } = P;
     const loc = locate(P);
@@ -265,6 +268,9 @@ const Reader = (() => {
     // メインスキルのレベル: 枠の右上の「Lv.1」の数字だけを読む。見出しの下端からの距離は一定
     res.skillLevel = await readSkillLevel(P, digits, W * 0.893, skill.b + W * 0.1277);
     if (res.skillLevel === null) res.warnings.push('スキルレベルを読めませんでした(1〜8で入れてください)');
+
+    // メインスキルの名前: 枠の左上の文字(「Lv.1」と同じ高さ)。種族を絞る手がかりに使う
+    res.skillName = await readSkillName(P, jpn, skill);
 
     // サブスキル: 2列3段。メインスキルの枠の下端からの距離は説明文の行数によらない
     for (let i = 0; i < 5; i++) {
@@ -300,6 +306,17 @@ const Reader = (() => {
     return res;
   }
 
+  // メインスキルの名前だけを読む(見本での確認用)
+  async function readSkillNameOnly(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ng(new Error('画像を開けませんでした')); im.src = url; });
+      const P = getPixels(img), loc = locate(P);
+      if (!loc) return null;
+      return await readSkillName(P, (await getWorkers()).jpn, loc.skill);
+    } finally { URL.revokeObjectURL(url); }
+  }
+
   async function read(file) {
     const url = URL.createObjectURL(file);
     try {
@@ -309,5 +326,5 @@ const Reader = (() => {
     } finally { URL.revokeObjectURL(url); }
   }
 
-  return { read, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
+  return { read, readSkillNameOnly, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
 })();

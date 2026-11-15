@@ -188,6 +188,73 @@ const Match = (() => {
     return next.length ? next.flatMap(finals) : [name];
   }
 
+
+  // ---------- 種族の推定(ニックネームの個体) ----------
+  // 詳細画面から分かること(メインスキル名・食材の個数・枠どうしが同じ絵か)で、取りうる種族を絞る。
+  // data/skills.js の MAIN_SKILLS(種族 → メインスキル名)を使う。画面には「(ランダム)」が付かないので外して比べる
+  const skillKey = (name) => fold(String(name ?? '').replace(/[$¥].*$/, '').replace(/[(（]ランダム[)）]/g, ''));
+  const SKILL_KEYS = typeof MAIN_SKILLS === 'undefined' ? [] : [...new Set(Object.values(MAIN_SKILLS).map(skillKey))];
+
+  // 読み取ったスキル名を、辞書のスキル名のどれかに直す。決まらなければ ''
+  function skillOf(text) {
+    const k = skillKey(text);
+    if (!k) return '';
+    if (SKILL_KEYS.includes(k)) return k;
+    // 括弧の中(ばけのかわ(きのみバースト) など)の読み違いは、前の部分が合えばよいことにする
+    const head = SKILL_KEYS.filter((x) => k.startsWith(x) || x.startsWith(k));
+    if (head.length === 1) return head[0];
+    const m = best(k, SKILL_KEYS, (len) => (len <= 6 ? 0 : 1));
+    return m ? m.value : '';
+  }
+
+  // 種族の食材の組み合わせごとに、画面に出る値(個数と、枠どうしが同じ絵か)を求める
+  function sightings(p) {
+    const [a] = p.ing;
+    return combos(p.name).map((c) => ({ amt: c.amt, eq21: c.ing[1] === a, eq31: c.ing[2] === a, eq32: c.ing[1] === c.ing[2] }));
+  }
+
+  // clues は reader の clues({ amount: [2枠目, 3枠目], s21, s31, s32 })。null や不明の値は絞り込みに使わない
+  function candidates(skillName, clues) {
+    const key = skillOf(skillName);
+    const known = (v) => v !== null && v !== undefined;
+    const flag = (v) => (known(v) ? v >= SAME : null);
+    const eq21 = flag(clues?.s21), eq31 = flag(clues?.s31), eq32 = flag(clues?.s32);
+    const [n2, n3] = clues?.amount ?? [null, null];
+    return POKEMON.filter((p) => {
+      if (p.myth) return false;
+      if (key && skillKey(MAIN_SKILLS[p.name]) !== key) return false;
+      return sightings(p).some((s) => (!known(n2) || s.amt[1] === n2) && (!known(n3) || s.amt[2] === n3)
+        && (eq21 === null || s.eq21 === eq21) && (eq31 === null || s.eq31 === eq31) && (eq32 === null || s.eq32 === eq32));
+    }).map((p) => p.name);
+  }
+
+
+  // 種族から引いたメインスキル名と、スクショから読んだ名前の突き合わせ。画面に出す内容を決める。
+  //   state: 'none' 種族が未選択か辞書にない / 'unknown' その種族のスキルがデータにない / 'mismatch' 読んだ名前と食い違う / 'ok'
+  // 読んだ名前(read)が読めていない・辞書にないときは、食い違いとは見なさない
+  function skillInfo(species, read = '') {
+    const p = find(species);
+    if (!p) return { state: 'none', name: '', read: '' };
+    const name = typeof MAIN_SKILLS === 'undefined' ? '' : MAIN_SKILLS[p.name] ?? '';
+    if (!name) return { state: 'unknown', name: '', read: '' };
+    const seen = skillOf(read);
+    if (seen && seen !== skillKey(name)) return { state: 'mismatch', name, read: String(read).replace(/[$¥].*$/, '').trim() };
+    return { state: 'ok', name, read: '' };
+  }
+
+  // 系統(進化のもと)ごとにまとめる
+  const rootOf = (name) => { let r = name; while (parentOf[r]) r = parentOf[r]; return r; };
+
+  // 推定の結果。{ kind: 'single', species } 系統が1つで最終進化も1つ / { kind: 'choose', options } 選んでもらう / { kind: 'none' } 決められない
+  function guessSpecies(skillName, clues) {
+    const names = candidates(skillName, clues);
+    if (!names.length) return { kind: 'none', options: [] };
+    const roots = [...new Set(names.map(rootOf))];
+    if (roots.length > 1) return { kind: 'choose', options: roots.flatMap((r) => finals(r)) };
+    const options = finals(roots[0]);
+    return options.length === 1 ? { kind: 'single', species: options[0], options } : { kind: 'choose', options };
+  }
+
   // 読み取った文字からスキルレベルを取り出す。1桁で1〜8だけを認める。
   // 「Lv.1」の「v」が「7」と読まれて「71」になることがあるので、最後の1桁だけを使う
   function skillLevelFrom(text) {
@@ -260,5 +327,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
+  return { skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();

@@ -17,6 +17,7 @@ function newRow(image = null) {
     nickname: '', species: '', level: NaN, readLevel: null, manualLevel: null, skillLevel: '', readSkill: '',
     ing: ['', '', ''], nature: '', sub: ['', '', '', '', ''], shiny: false, mint: false, ribbon: 0, seed: false, base: null, picked: false,
     low: new Set(), candidates: [], clues: null, icon: '', notes: [],
+    skillRead: '',    // スクショから読んだメインスキル名(種族から引いた名前との食い違いを調べる)
     shown: '',        // スクショに写っている種族。進化を選んでも変わらない(見本の保存と「進化する」の基準)
     pending: false,   // 「進化する」を入れたが、分岐があって進化先が決まっていない
   };
@@ -37,6 +38,7 @@ function applyReading(row, read) {
   row.sub = read.sub.map((t, i) => take(`sub${i}`, Match.subskill(t, read.subColor[i])));
   row.readLevel = read.level ?? null;
   if (read.level === null) row.low.add('level'); // 読めない、または範囲外のときは空欄にして印を付ける
+  row.skillRead = read.skillName ?? '';
   row.skillLevel = row.readSkill = read.skillLevel ?? '';
   if (read.skillLevel === null) row.low.add('skillLevel'); // 読めないときは黄色にして確認を促す
   row.clues = read.clues;
@@ -105,6 +107,13 @@ function showCombos(button, row) {
   button.parentElement.append(ul);
 }
 
+// メインスキルの名前。種族から引いた名前を出す。引けないときや読んだ名前と食い違うときは、確定のようには出さない
+function skillNameHtml(row) {
+  const i = Match.skillInfo(row.species, row.skillRead);
+  const note = { none: 'ポケモンを選ぶと出ます', unknown: 'この種族のスキルはデータにありません', mismatch: `スクショでは「${i.read}」でした。ポケモンを見直してください` }[i.state];
+  return `<output class="sk-val${i.state === 'ok' ? '' : ' sk-none'}">${esc(i.state === 'ok' || i.state === 'mismatch' ? i.name : '—')}</output>${note ? `<small class="sk-note${i.state === 'mismatch' ? ' sk-warn' : ''}">${esc(note)}</small>` : ''}`;
+}
+
 // 進化の選択。系統に複数の種族があるときだけ出す。「進化する」は、スクショの種族から最終進化形へ切り替える
 function evolutionField(row) {
   const names = Match.line(row.species);
@@ -138,6 +147,7 @@ function rowHtml(row, box = false) {
     </div>
     <div class="fields">
       <label class="field" data-key="level"><span>レベル</span><input type="number" data-edit="level" min="1" max="100" value="${Number.isNaN(row.level) ? '' : row.level}"></label>
+      <div class="field wide skill-name" data-key="skillName"><span>メインスキル</span><div class="sk-body" data-skill-name>${skillNameHtml(row)}</div></div>
       <label class="field" data-key="skillLevel"><span>スキルレベル</span><input type="number" data-edit="skillLevel" min="1" max="8" value="${row.skillLevel}"></label>
       ${selectField('性格', 'nature', row.nature, NATURES)}
       <label class="check"><input type="checkbox" data-edit="shiny"${row.shiny ? ' checked' : ''}>色違い</label>
@@ -279,6 +289,11 @@ function refreshRow(row, el) {
   seedNote.hidden = !row.seed;
   seedNote.textContent = changed.length ? `銀種で変わる: ${changed.join('、')}` : '銀種を使っても変わりません。';
   el.querySelector('[data-key="species"]').classList.toggle('missing', !row.species);
+  const skillBox = el.querySelector('[data-skill-name]');
+  if (skillBox) {
+    skillBox.innerHTML = skillNameHtml(row);
+    skillBox.closest('.skill-name').classList.toggle('low', Match.skillInfo(row.species, row.skillRead).state === 'mismatch');
+  }
   const notes = [...row.notes.map((t) => ['warning', t]), ...warnings.map((t) => ['warning', t]), ...errors.map((t) => ['error', t])];
   el.querySelector('.messages').innerHTML = notes.map(([c, t]) => `<li class="${c}">${esc(t)}</li>`).join('');
   return errors;

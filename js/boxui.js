@@ -283,7 +283,10 @@ const BoxUi = (() => {
     <div class="sheet-block">${ingredientField(row, own)}</div>
     <h3 class="band">メインスキル・サブスキル</h3>
     <div class="sheet-block">
-      <label class="field" data-key="skillLevel"><span>メインスキルのレベル</span><select data-edit="skillLevel">${skills}</select></label>
+      <div class="skill-row">
+        <div class="field skill-name" data-key="skillName"><span>メインスキル</span><div class="sk-body" data-skill-name>${skillNameHtml(row)}</div></div>
+        <label class="field" data-key="skillLevel"><span>レベル</span><select data-edit="skillLevel">${skills}</select></label>
+      </div>
       <div class="sub-grid">${row.sub.map((s, i) => selectField(`Lv${[10, 25, 50, 75, 100][i]}`, `sub${i}`, s, SUBSKILLS)).join('')}</div>
     </div>
     <h3 class="band">詳細ステータス</h3>

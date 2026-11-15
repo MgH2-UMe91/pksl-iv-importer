@@ -427,6 +427,21 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('複製しても元の並びは変わらない', rows.length, 4);
 }
 
+// メインスキル名(種族から引く・スクショで読んだ名前との突き合わせ)
+{
+  eq('全251種のスキル名がある', POKEMON.every((p) => MAIN_SKILLS[p.name]), true);
+  eq('種族から引く', [Match.skillInfo('フシギダネ').name, Match.skillInfo('ミミッキュ').name], ['食材ゲットS', 'ばけのかわ (きのみバースト)']);
+  eq('姿違いも引ける', [Match.skillInfo('ウパー(パルデア)').state, Match.skillInfo('バケッチャ(こだましゅ)').state], ['ok', 'ok']);
+  eq('種族が未選択・辞書にないときは none', [Match.skillInfo('').state, Match.skillInfo('そんなポケモン').state], ['none', 'none']);
+  eq('スキルがデータにない種族は unknown', (() => { const keep = MAIN_SKILLS['ピカチュウ']; delete MAIN_SKILLS['ピカチュウ']; const st = Match.skillInfo('ピカチュウ').state; MAIN_SKILLS['ピカチュウ'] = keep; return st; })(), 'unknown');
+  eq('読んだ名前と合えば ok(末尾のゴミ・(ランダム)の有無・括弧の空白は無視)', [
+    Match.skillInfo('フシギダネ', '食材ゲットS$S').state, Match.skillInfo('ゲンガー', 'エナジーチャージS').state, Match.skillInfo('ミミッキュ', 'ばけのかわ(きのみバースト)').state,
+  ], ['ok', 'ok', 'ok']);
+  eq('読んだ名前と食い違えば mismatch(読んだ名前を返す)', [Match.skillInfo('フシギダネ', 'げんきチャージS$S').state, Match.skillInfo('フシギダネ', 'げんきチャージS$S').read], ['mismatch', 'げんきチャージS']);
+  eq('読めない・辞書にない名前は食い違いと見なさない', [Match.skillInfo('フシギダネ', '').state, Match.skillInfo('フシギダネ', '####').state], ['ok', 'ok']);
+  eq('スキル名の読み違い(1字)は直る', Match.skillOf('おてつだいブ一スト') !== '', true);
+}
+
 // CSV・TSV の読み込み
 {
   const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });

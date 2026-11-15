@@ -583,3 +583,12 @@ html.selecting #box-app { padding-bottom: calc(var(--bar-h) + 150px); }
 .chip[data-type="flying"] { --tc: #6aa8d0; } .chip[data-type="psychic"] { --tc: #e0507f; } .chip[data-type="bug"] { --tc: #8a9620; }
 .chip[data-type="rock"] { --tc: #96905f; } .chip[data-type="ghost"] { --tc: #7a4d86; } .chip[data-type="dragon"] { --tc: #5468d8; }
 .chip[data-type="dark"] { --tc: #5e4c48; } .chip[data-type="steel"] { --tc: #6f93a8; } .chip[data-type="fairy"] { --tc: #c76ac7; }
+
+/* メインスキルの名前(種族から引いた名前。引けないときは「—」と理由) */
+.skill-row { display: grid; grid-template-columns: 1fr 7.5rem; gap: 8px; align-items: start; }
+.skill-name .sk-body { min-height: 38px; display: flex; flex-direction: column; justify-content: center; }
+.sk-val { font-weight: 700; font-size: 1rem; overflow-wrap: anywhere; }
+.sk-val.sk-none { font-weight: 400; color: var(--muted); }
+.sk-note { display: block; margin-top: 2px; font-size: 0.72rem; line-height: 1.3; color: var(--muted); }
+.sk-note.sk-warn { color: var(--error); }
+.field.skill-name.low .sk-body { border: 2px solid var(--low-line); border-radius: 6px; padding: 2px 8px; }
