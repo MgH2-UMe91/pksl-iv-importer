@@ -237,6 +237,28 @@ const Reader = (() => {
   // メインスキルの名前。枠の左上の文字で、「Lv.1」と同じ高さ
   const readSkillName = (P, jpn, skill) => ocr(jpn, cropText(P, P.W * 0.25, skill.b + P.W * 0.1277 - P.W * 0.03, P.W * 0.8, skill.b + P.W * 0.1277 + P.W * 0.03));
 
+  // 食材アイコンの色の特徴。背景からの差の向き(薄く表示された解放前の絵でも比べられる)を、絵の上下2か所について6つの数にする。
+  // 名札や個数の札、鍵の札にかかる部分は除く。絵は復元できない粗さ。cx, cy は円の中心、R は円の半径(画素)
+  function iconFeature(P, cx, cy, R) {
+    const ctx = P.c.getContext('2d', { willReadFrequently: true });
+    const x0 = Math.max(0, Math.round(cx - R)), y0 = Math.max(0, Math.round(cy - R));
+    const size = Math.round(2 * R);
+    const d = ctx.getImageData(x0, y0, Math.min(size, P.W - x0), Math.min(size, P.H - y0));
+    const bg = P.px(cx - R * 0.8, cy + R * 0.1);
+    const acc = [[0, 0, 0, 0], [0, 0, 0, 0]];
+    for (let j = 0; j < d.height; j++) {
+      for (let i = 0; i < d.width; i++) {
+        const dx = x0 + i - cx, dy = y0 + j - cy;
+        if (dx * dx + dy * dy > R * R * 0.78 || dy < -0.15 * R || (dx > 0.3 * R && dy > 0.4 * R)) continue;
+        const a = acc[dy < 0.35 * R ? 0 : 1], k = (j * d.width + i) * 4;
+        a[0] += d.data[k] - bg[0]; a[1] += d.data[k + 1] - bg[1]; a[2] += d.data[k + 2] - bg[2]; a[3]++;
+      }
+    }
+    const v = acc.flatMap((a) => (a[3] ? [a[0] / a[3], a[1] / a[3], a[2] / a[3]] : [0, 0, 0]));
+    const n = Math.hypot(...v) || 1;
+    return v.map((t) => Math.round((t / n) * 100));
+  }
+
   async function analyze(img) {
     const P = getPixels(img), { W } = P;
     const loc = locate(P);
@@ -302,6 +324,8 @@ const Reader = (() => {
       s21: visible ? similarity(P, icon[0], icon[1], stripTop, stripBottom) : null,
       s31: visible ? similarity(P, icon[0], icon[2], stripTop, stripBottom) : null,
       s32: similarity(P, icon[1], icon[2], iy - W * 0.04, stripBottom),
+      // 2枠目・3枠目の食材の色の特徴(1枠目は名札にかかることがあり、種族で決まるので使わない)
+      feat: [icon[1], icon[2]].map((cx) => iconFeature(P, cx, iy + W * 0.005, W * 0.055)),
     };
     return res;
   }
@@ -326,5 +350,5 @@ const Reader = (() => {
     } finally { URL.revokeObjectURL(url); }
   }
 
-  return { read, readSkillNameOnly, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
+  return { read, readSkillNameOnly, iconFeature, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
 })();

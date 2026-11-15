@@ -245,14 +245,43 @@ const Match = (() => {
   // 系統(進化のもと)ごとにまとめる
   const rootOf = (name) => { let r = name; while (parentOf[r]) r = parentOf[r]; return r; };
 
-  // 推定の結果。{ kind: 'single', species } 系統が1つで最終進化も1つ / { kind: 'choose', options } 選んでもらう / { kind: 'none' } 決められない
+  // 2枠目・3枠目の絵(色の特徴)が、その種族の食材のどれかの組み合わせにどれだけ合うか。小さいほど合う。特徴がなければ null
+  const featDist = (a, b) => Math.hypot(...a.map((t, i) => t - b[i]));
+  function ingredientFit(name, feats) {
+    if (typeof ING_FEAT === 'undefined' || !feats || !feats[0] || !feats[1]) return null;
+    let top = null;
+    for (const c of combos(name)) {
+      const f2 = ING_FEAT[c.ing[1]], f3 = ING_FEAT[c.ing[2]];
+      if (!f2 || !f3) continue;
+      const d = featDist(feats[0], f2) + featDist(feats[1], f3);
+      if (top === null || d < top) top = d;
+    }
+    return top;
+  }
+
+  // 推定の結果。
+  //   { kind: 'single', species, options } 系統が1つで最終進化も1つ(自動で入れる)
+  //   { kind: 'choose', options, ranked } 選んでもらう。系統が1つで最終進化が複数(イーブイなど)か、複数の系統が残った場合。
+  //     複数の系統は、食材の絵が合う順に並べる(ranked が true なら絵で並べた)
+  //   { kind: 'none', options: [] } 決められない
+  const MAX_OPTIONS = 12;
   function guessSpecies(skillName, clues) {
     const names = candidates(skillName, clues);
     if (!names.length) return { kind: 'none', options: [] };
     const roots = [...new Set(names.map(rootOf))];
-    if (roots.length > 1) return { kind: 'choose', options: roots.flatMap((r) => finals(r)) };
-    const options = finals(roots[0]);
-    return options.length === 1 ? { kind: 'single', species: options[0], options } : { kind: 'choose', options };
+    if (roots.length === 1) {
+      const options = finals(roots[0]);
+      return options.length === 1 ? { kind: 'single', species: options[0], options } : { kind: 'choose', options, ranked: false };
+    }
+    // 複数の系統: 系統ごとに、食材の絵が一番合う種族の点で並べる
+    const fit = new Map();
+    for (const r of roots) {
+      const scores = names.filter((n) => rootOf(n) === r).map((n) => ingredientFit(n, clues?.feat)).filter((v) => v !== null);
+      fit.set(r, scores.length ? Math.min(...scores) : null);
+    }
+    const ranked = roots.every((r) => fit.get(r) !== null);
+    const order = ranked ? roots.slice().sort((x, y) => fit.get(x) - fit.get(y)) : roots;
+    return { kind: 'choose', options: order.flatMap((r) => finals(r)).slice(0, MAX_OPTIONS), ranked };
   }
 
   // 読み取った文字からスキルレベルを取り出す。1桁で1〜8だけを認める。
@@ -327,5 +356,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
+  return { ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();

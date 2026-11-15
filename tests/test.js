@@ -442,6 +442,24 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('スキル名の読み違い(1字)は直る', Match.skillOf('おてつだいブ一スト') !== '', true);
 }
 
+// ニックネームの個体の種族推定(メインスキル+食材の個数・同じ絵+食材の絵の特徴)
+{
+  const clueOf = (name, comboIdx = 0) => {
+    const c = Match.combos(name)[comboIdx], a = c.ing[0];
+    return { amount: [c.amt[1], c.amt[2]], s21: c.ing[1] === a ? 1 : 0, s31: c.ing[2] === a ? 1 : 0, s32: c.ing[1] === c.ing[2] ? 1 : 0, feat: [ING_FEAT[c.ing[1]], ING_FEAT[c.ing[2]]] };
+  };
+  eq('食材の見本は19種(どの種族の食材も揃っている)', [Object.keys(ING_FEAT).length, POKEMON.every((p) => (p.myth ?? p.ing).every((g) => ING_FEAT[g]?.length === 6))], [19, true]);
+  eq('系統が1つなら最終進化を自動で選ぶ(ミミッキュ)', Match.guessSpecies(MAIN_SKILLS['ミミッキュ'], clueOf('ミミッキュ')), { kind: 'single', species: 'ミミッキュ', options: ['ミミッキュ'] });
+  eq('進化前のスキル・食材でも最終進化(ムウマ → ムウマージ)', Match.guessSpecies(MAIN_SKILLS['ムウマ'], { ...clueOf('ムウマ'), feat: null }).species ?? Match.guessSpecies(MAIN_SKILLS['ムウマ'], clueOf('ムウマ')).options[0], 'ムウマージ');
+  const g = Match.guessSpecies(MAIN_SKILLS['フシギダネ'], clueOf('フシギダネ'));
+  eq('ほかの系統も残れば選んでもらう(食材の絵が合う順で、本物が先頭)', [g.kind, g.ranked, g.options[0], g.options.includes('リザードン')], ['choose', true, 'フシギバナ', true]);
+  eq('絵の特徴がなければ並べ替えない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), feat: null }).ranked, false);
+  eq('分岐進化は最終進化の候補を出す(イーブイ)', (() => { const r = Match.guessSpecies(MAIN_SKILLS['イーブイ'], { ...clueOf('イーブイ'), amount: [null, null], s21: null, s31: null, s32: null }); return r.kind; })(), 'choose');
+  eq('どれにも合わなければ none', Match.guessSpecies('ありえないスキル名です', { amount: [99, 99], s21: null, s31: null, s32: null }).kind, 'none');
+  eq('食材の絵の合い具合は、同じ食材の並びなら 0', Match.ingredientFit('フシギダネ', clueOf('フシギダネ').feat), 0);
+  eq('特徴がなければ null', Match.ingredientFit('フシギダネ', null), null);
+}
+
 // CSV・TSV の読み込み
 {
   const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>食材の見本の作成</title>
+<p>ゲームの「リサーチノート」の食材の一覧のスクショ(iPhone の元の大きさ 1170×2532)を選ぶと、<code>data/ingfeat.js</code> の中身を出します。画像は端末の外へ送りません。画像そのものは保存しません。</p>
+<input type="file" id="f" accept="image/*"><br><textarea id="out" rows="12" cols="80"></textarea>
+<script src="../js/reader.js"></script>
+<script>
+const NAMES = ['ふといながねぎ', 'あじわいキノコ', 'とくせんエッグ', 'ほっこりポテト', 'とくせんリンゴ', 'げきからハーブ', 'マメミート', 'モーモーミルク', 'あまいミツ', 'ピュアなオイル', 'あったかジンジャー', 'あんみんトマト', 'リラックスカカオ', 'おいしいシッポ', 'ワカクサ大豆', 'ワカクサコーン', 'めざましコーヒー', 'ずっしりカボチャ', 'つやつやアボカド'];
+const XS = [172, 443, 715, 986], YS = [428, 838, 1248, 1656, 2066], R = 101;
+const run = async (file) => {
+  const img = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.src = URL.createObjectURL(file); });
+  const P = Reader.getPixels(img);
+  if (P.W !== 1170) { out.value = '画像の幅が 1170 ではありません: ' + P.W; return; }
+  const o = {};
+  NAMES.forEach((n, i) => { o[n] = Reader.iconFeature(P, XS[i % 4], YS[Math.floor(i / 4)], R); });
+  out.value = `// tools/ingfeat.html の生成物。手で直さない。\n// 食材アイコンの色の特徴(上下2か所の色の向き、各6つ)。ゲームの絵そのものは含まない。\n'use strict';\n\nconst ING_FEAT = ${JSON.stringify(o)};\n`;
+};
+document.getElementById('f').addEventListener('change', (e) => run(e.target.files[0]));
+</script></html>

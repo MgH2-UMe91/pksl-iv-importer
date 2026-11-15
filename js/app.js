@@ -43,8 +43,24 @@ function applyReading(row, read) {
   if (read.skillLevel === null) row.low.add('skillLevel'); // 読めないときは黄色にして確認を促す
   row.clues = read.clues;
   row.icon = read.icon;
-  row.notes = read.warnings;
+  row.notes = [...read.warnings];
+  guessSpecies(row, read);
   applyIngredients(row);
+}
+
+// 種族名が画面に出ない個体(ニックネームなど)の種族を、メインスキルと食材の手がかりから推定する。
+// 系統が1つなら最終進化形を入れる(印を付けて確認を促す)。ほかの系統も残るときは、候補を食材の絵が合う順に出して選んでもらう
+function guessSpecies(row, read) {
+  if (row.species || row.candidates.length) return;
+  const g = Match.guessSpecies(read.skillName, read.clues);
+  if (g.kind === 'single') {
+    row.species = g.species;
+    row.low.add('species');
+    row.notes.push(`ニックネームの個体なので、メインスキルと食材から「${g.species}」と推定しました。違うときはポケモンの欄で選び直してください`);
+  } else if (g.kind === 'choose') {
+    row.candidates = g.options;
+    row.notes.push(`メインスキルと食材から、ポケモンの候補を${g.options.length}種に絞りました。ポケモンの欄を押して選んでください`);
+  }
 }
 
 // 種族が決まったら、読み取った手がかりからその種族の食材を判定する
@@ -110,6 +126,11 @@ function showCombos(button, row) {
 // メインスキルの名前。種族から引いた名前を出す。引けないときや読んだ名前と食い違うときは、確定のようには出さない
 function skillNameHtml(row) {
   const i = Match.skillInfo(row.species, row.skillRead);
+  // 種族が決まっていなくても、スクショから読めた名前があればそれを出す(種族を選ぶと、種族のスキルと突き合わせる)
+  if (i.state === 'none' && Match.skillOf(row.skillRead)) {
+    const read = String(row.skillRead).replace(/[$¥].*$/, '').trim();
+    return `<output class="sk-val">${esc(read)}</output><small class="sk-note">スクショから読み取った名前です</small>`;
+  }
   const note = { none: 'ポケモンを選ぶと出ます', unknown: 'この種族のスキルはデータにありません', mismatch: `スクショでは「${i.read}」でした。ポケモンを見直してください` }[i.state];
   return `<output class="sk-val${i.state === 'ok' ? '' : ' sk-none'}">${esc(i.state === 'ok' || i.state === 'mismatch' ? i.name : '—')}</output>${note ? `<small class="sk-note${i.state === 'mismatch' ? ' sk-warn' : ''}">${esc(note)}</small>` : ''}`;
 }
