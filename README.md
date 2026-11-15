@@ -33,6 +33,7 @@
 | --- | --- | --- |
 | `data/pokemon.js` の種族・食材・タイプ(タイプはポケモンのきのみのタイプ) | [nerolis-lab](https://github.com/nerolis-lab/nerolis-lab) | Apache-2.0 |
 | `data/pokemon.js` の日本語の種族名 | [PokeAPI](https://github.com/PokeAPI/pokeapi) | BSD-3-Clause |
+| `data/pokeicons.js`(BOX の色の四角アイコン。`tools/build_pokeicons.js` で作る) | [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool) の PokemonIconData.ts | MIT(全文と著作権表示は `THIRD-PARTY-LICENSES.txt`) |
 | `vendor/` | [Tesseract.js](https://github.com/naptha/tesseract.js) と学習データ | Apache-2.0(`vendor/README.txt`) |
 
 個体値計算機のリポジトリには LICENSE が見当たらないため、コードとデータはコピーしていません。ただし姿違いの種族名の表記は、取り込みに必要なので個体値計算機が受け付ける表記に合わせています。

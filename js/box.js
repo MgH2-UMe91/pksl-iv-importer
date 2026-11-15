@@ -73,12 +73,15 @@ const Box = (() => {
   };
 
   const PAGE_SIZE = 40; // 4列の箱の、4の倍数
-  // 5 のリストに出す個体を決める。opts: { query, ingredient, onlyFlag, sort, page(0始まり) }
+  // 5 のリストに出す個体を決める。opts: { query, ingredient, types, subs, nicknamed, onlyFlag, sort(added/newest/species/type/level/dex), reverse, page(0始まり) }
   // 返す値: { items: [{ a, i, flag }](このページ), count(絞り込み後の匹数), pages, page, flagged(BOX全体の要確認の数) }
   // 種族名 -> タイプ(data/pokemon.js)。データにない名前は undefined
   let typeMap = null;
   const typeOf = (name) => { if (!typeMap) typeMap = new Map(POKEMON.map((p) => [p.name, p.type])); return typeMap.get(name); };
   const TYPE_ORDER = POKEMON_TYPES.map((t) => t[0]);
+  // 種族名 -> 図鑑番号(図鑑番号順の並べ替え用)。データにない名前は大きな値
+  let noMap = null;
+  const noOf = (name) => { if (!noMap) noMap = new Map(POKEMON.map((p) => [p.name, p.no])); return noMap.get(name) ?? 1e9; };
   const typeRank = (name) => { const i = TYPE_ORDER.indexOf(typeOf(name)); return i < 0 ? 99 : i; };
 
   function view(rows, opts = {}) {
@@ -89,11 +92,14 @@ const Box = (() => {
       && (!opts.ingredient || x.a[4].includes(opts.ingredient))
       && (!opts.types || !opts.types.length || opts.types.includes(typeOf(x.a[1]))) // 選んだタイプのどれか
       && (!opts.subs || !opts.subs.length || opts.subs.every((s) => x.a[6].includes(s))) // 選んだサブスキルをすべて持つ
+      && (!opts.nicknamed || String(x.a[0]).trim() !== '') // ニックネームをつけた個体だけ
       && (!opts.onlyFlag || x.flag));
     if (opts.sort === 'newest') items.reverse();
     else if (opts.sort === 'species') items.sort((x, y) => String(x.a[1]).localeCompare(String(y.a[1]), 'ja') || x.i - y.i);
     else if (opts.sort === 'type') items.sort((x, y) => typeRank(x.a[1]) - typeRank(y.a[1]) || String(x.a[1]).localeCompare(String(y.a[1]), 'ja') || x.i - y.i);
     else if (opts.sort === 'level') items.sort((x, y) => (y.a[2] ?? 0) - (x.a[2] ?? 0) || x.i - y.i);
+    else if (opts.sort === 'dex') items.sort((x, y) => noOf(x.a[1]) - noOf(y.a[1]) || x.i - y.i);
+    if (opts.reverse) items.reverse(); // ↓/↑ の向きを逆にする
     const size = opts.pageSize ?? PAGE_SIZE; // 画面は全匹をスクロールで見せるので、大きな値を渡す
     const pages = Math.max(1, Math.ceil(items.length / size));
     const page = Math.min(Math.max(0, opts.page ?? 0), pages - 1);
@@ -143,6 +149,8 @@ const Box = (() => {
   // 選んだ個体(BOX の並びの順)
   const pick = (rows, idxs) => [...idxs].filter((i) => Number.isInteger(i) && i >= 0 && i < rows.length).sort((a, b) => a - b).map((i) => rows[i]);
   // 選んだ個体を除いた並び(残りの順番は変えない)
+  // i 番の個体の複製を、末尾に足した並びを返す(入るかどうかは呼ぶ側が canMove で確かめる)
+  const duplicate = (rows, i) => rows.concat([JSON.parse(JSON.stringify(rows[i]))]);
   const removeMany = (rows, idxs) => { const s = new Set(idxs); return rows.filter((_, i) => !s.has(i)); };
   // もう一方の BOX へ移せるか。入りきらなければ、入る数(room)を返して移さない
   const canMove = (count, dstLength) => { const room = MAX - dstLength; return { fits: count <= room, room }; };
@@ -164,5 +172,5 @@ const Box = (() => {
 
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, typeOf, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, canMove, bulkApply, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, typeOf, noOf, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, duplicate, canMove, bulkApply, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
 })();

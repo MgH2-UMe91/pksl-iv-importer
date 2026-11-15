@@ -39,10 +39,12 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   <button id="tab-box" type="button" role="tab" aria-selected="false" aria-controls="pane-box">BOX</button>
 </nav>
 <div id="box-top" class="box-top" hidden>
-  <div class="box-tabs" id="box-tabs" role="tablist"></div>
+  <div class="box-row">
+    <div class="box-tabs" id="box-tabs" role="tablist"></div>
+    <button id="sel-start" type="button" class="sel-start">複数選択</button>
+  </div>
   <div class="sel-row">
     <span id="box-count" class="note" role="status"></span>
-    <button id="sel-start" type="button">複数選択</button>
     <span id="sel-tools" class="sel-tools" hidden>
       <span id="sel-count" role="status"></span>
       <button id="sel-all" type="button">全部選ぶ</button>
@@ -136,8 +138,10 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
     <div class="box-grid-wrap" id="box-grid-wrap">
       <div id="box-grid" class="box-grid"></div>
       <div id="box-cell-menu" class="pop-menu" role="menu" hidden>
-        <button type="button" role="menuitem" id="cell-edit">✎ 編集</button>
-        <button type="button" role="menuitem" id="cell-delete" class="danger-text">⊖ 削除</button>
+        <button type="button" role="menuitem" id="cell-edit"><i aria-hidden="true">✎</i>編集</button>
+        <button type="button" role="menuitem" id="cell-move"><i aria-hidden="true">↔</i><span id="cell-move-label">BOX2へ移動</span></button>
+        <button type="button" role="menuitem" id="cell-dup"><i aria-hidden="true">⧉</i>複製</button>
+        <button type="button" role="menuitem" id="cell-delete" class="danger-text"><i aria-hidden="true">⊖</i>削除</button>
       </div>
     </div>
     <p class="note">※BOXはこの端末のこのアプリの中だけに保存されます。アプリを消すと中身も消えるので、大事なBOXはCSVで保存してください。</p>
@@ -148,13 +152,21 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 
 <div id="box-bar" class="box-bar" hidden>
   <button id="filter-open" type="button" class="filter-btn" aria-haspopup="dialog" aria-label="絞り込み・並べ替え">🔍 OFF</button>
-  <button id="box-import-open" type="button" aria-haspopup="dialog">CSVを読み込む</button>
-  <button id="box-copy" type="button">CSVをコピー</button>
+  <button id="sort-open" type="button" class="sort-btn" aria-haspopup="menu" aria-expanded="false" aria-label="並べ替え">レベル</button>
+  <button id="sort-dir" type="button" class="sort-dir" aria-label="並べ替えの向きを逆にする">↓</button>
+  <span class="bar-grow"></span>
+  <button id="csv-open" type="button" aria-haspopup="menu" aria-expanded="false">CSV ▾</button>
   <button id="box-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="そのほかの操作">⋯</button>
 </div>
+<div id="sort-menu" class="pop-menu more-menu bar-sort" role="menu" hidden></div>
+<div id="csv-menu" class="pop-menu more-menu bar-more bar-csv" role="menu" hidden>
+  <button id="box-import-open" type="button" role="menuitem" aria-haspopup="dialog">CSVを読み込む</button>
+  <button id="box-copy" type="button" role="menuitem">CSVをコピー</button>
+  <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
 <div id="box-more" class="pop-menu more-menu bar-more" role="menu" hidden>
   <button id="box-rename" type="button" role="menuitem">名前を変える</button>
-  <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
   <button id="box-restore" type="button" role="menuitem">3へ戻して編集</button>
   <button id="box-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
 </div>
@@ -162,19 +174,19 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 <dialog id="filter-dialog" class="modal" aria-labelledby="filter-title">
   <div class="modal-body">
     <h3 id="filter-title" tabindex="-1">絞り込み・並べ替え</h3>
-    <label class="field"><span>名前・ニックネーム</span><input id="box-filter" type="search" placeholder="名前で絞り込み" autocomplete="off"></label>
-    <label class="field"><span>食材</span><select id="box-ing" aria-label="食材で絞り込む"></select></label>
-    <div class="field"><span>タイプ(複数選べます。どれかに当てはまる個体)</span><div id="filter-types" class="chips2"></div></div>
-    <div class="field"><span>サブスキル(複数選ぶと、すべて持つ個体)</span><div id="filter-subs" class="chips2"></div></div>
-    <label class="field"><span>並べ替え</span>
-      <select id="box-sort" aria-label="並べ替え">
-        <option value="added">追加順</option>
-        <option value="newest">新しい順</option>
-        <option value="level">レベル順</option>
-        <option value="species">種族名順</option>
-        <option value="type">タイプ順</option>
-      </select>
-    </label>
+    <label class="field"><input id="box-filter" type="search" placeholder="名前・ニックネームで検索" autocomplete="off" aria-label="名前・ニックネームで検索"></label>
+    <div class="ftabs" id="filter-tabs" role="tablist" aria-label="絞り込みの項目">
+      <button type="button" role="tab" data-ft="type" aria-selected="true">タイプ</button>
+      <button type="button" role="tab" data-ft="ing" aria-selected="false">食材</button>
+      <button type="button" role="tab" data-ft="sub" aria-selected="false">サブスキル</button>
+      <button type="button" role="tab" data-ft="nick" aria-selected="false">ニックネーム</button>
+    </div>
+    <div class="fpanel" data-fp="type"><p class="note">複数選べます。どれかに当てはまる個体を出します。</p><div id="filter-types" class="chips2"></div></div>
+    <div class="fpanel" data-fp="ing" hidden><p class="note">食材を1つ選ぶと、その食材を持つ個体を出します。</p><div id="filter-ings" class="chips2"></div></div>
+    <div class="fpanel" data-fp="sub" hidden><p class="note">複数選ぶと、すべて持つ個体を出します。</p><div id="filter-subs" class="chips2"></div></div>
+    <div class="fpanel" data-fp="nick" hidden><label class="check"><input id="filter-nick" type="checkbox">ニックネームをつけた個体だけ</label></div>
+    <h4 class="fh">並べ替え</h4>
+    <div id="filter-sorts" class="chips2"></div>
     <p id="filter-count" class="note" role="status"></p>
     <div class="modal-actions">
       <button id="filter-clear" type="button">解除</button>
@@ -236,7 +248,8 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
       <li>制作者: ゆめくい(X: <a href="https://x.com/youmay91" target="_blank" rel="noopener noreferrer">@youmay91</a>)</li>
       <li>うまく読み取れなかった時は、加工していないスクショを4枚ほど<a href="https://x.com/youmay91" target="_blank" rel="noopener noreferrer">制作者のX</a>へ送ってください。</li>
     </ul>
-    <p class="note">バージョン: <span id="about-version">…</span></p>
+    <p class="note">BOXの色の四角アイコンは、nitoyon さんの個体値計算機のデータ(MIT License)を使っています。<a href="THIRD-PARTY-LICENSES.txt" target="_blank" rel="noopener">ライセンス全文</a></p>
+    <p class="note">バージョン:<span id="about-version">…</span></p>
     <div class="modal-actions"><button id="about-close" type="button" class="primary">閉じる</button></div>
   </div>
 </dialog>
@@ -261,6 +274,7 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 <script src="data/pokemon.js"></script>
 <script src="data/dict.js"></script>
 <script src="data/icons.js"></script>
+<script src="data/pokeicons.js"></script>
 <script src="data/evolution.js"></script>
 <script src="js/match.js"></script>
 <script src="js/csv.js"></script>

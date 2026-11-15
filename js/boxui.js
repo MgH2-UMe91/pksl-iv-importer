@@ -12,6 +12,10 @@ const BoxUi = (() => {
   let selectMode = false; // 複数選択のモードか
   let typesSel = new Set(); // タイプの絞り込み(タイプの英語名)
   let subsSel = new Set();  // サブスキルの絞り込み(名前)
+  let ingSel = '';          // 食材の絞り込み(食材名。空なら絞らない)
+  let nickOnly = false;     // ニックネームをつけた個体だけ
+  let sortKey = 'added';    // 並べ替え
+  let reverse = false;      // 並べ替えの向きを逆にしているか(↓ が通常、↑ が逆)
   let picked = new Set(); // 複数選択で選んでいる個体の番号
   let sheet = null;      // 開いている編集画面 { idx, row, order, timer }
   let savedSig = '';     // 最後に保存した(または戻した)ときの 3 の中身。違えば「保存していない行がある」
@@ -94,17 +98,27 @@ const BoxUi = (() => {
   }
 
   // 全匹をスクロールで見せる(ページ分けはしない)
-  const viewOpts = () => ({ query: g('box-filter').value, ingredient: g('box-ing').value, types: [...typesSel], subs: [...subsSel], onlyFlag, sort: g('box-sort').value, page: 0, pageSize: 1e9 });
+  const SORTS = [['level', 'レベル'], ['species', '名前'], ['dex', '図鑑番号'], ['type', 'タイプ'], ['added', '追加順']];
+  const viewOpts = () => ({ query: g('box-filter').value, ingredient: ingSel, types: [...typesSel], subs: [...subsSel], nicknamed: nickOnly, onlyFlag, sort: sortKey, reverse, page: 0, pageSize: 1e9 });
   // 絞り込みがかかっているか(並べ替えは含めない)
-  const isFiltering = () => !!(g('box-filter').value.trim() || g('box-ing').value || typesSel.size || subsSel.size || onlyFlag);
+  const isFiltering = () => !!(g('box-filter').value.trim() || ingSel || typesSel.size || subsSel.size || nickOnly || onlyFlag);
   const label = (a) => `${a[1] || '(種族なし)'}${a[0] ? `(${a[0]})` : ''}`;
 
+  // 色の四角アイコン(data/pokeicons.js)。色違いは色違い用の色。データにない種族は灰色の四角
+  function iconSvg(name, shiny, size = 32) {
+    const d = POKE_ICONS[name];
+    if (!d) return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true"><rect width="${size}" height="${size}" fill="#bbbbbb"/></svg>`;
+    const pal = shiny ? d[1] : d[0];
+    const f = (v) => (v * size).toFixed(1);
+    const rects = d[2].map(([x, y, w, h, r, c]) => `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}"${r ? ` rx="${f(r)}"` : ''} fill="${pal[c]}"/>`).join('');
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">${rects}</svg>`;
+  }
+
   function cellHtml({ a, i, flag }) {
-    const ings = a[4].map((n) => (n ? `<span class="ico xs" title="${esc(n)}">${INGREDIENT_ICONS[n] ?? ''}</span>` : '<span class="ico xs none">−</span>')).join('');
-    const nm = Box.splitName(a[1] || '(未設定)');
-    const cls = `cell${flag ? ' flag' : ''}${!selectMode && selected === i ? ' sel' : ''}${selectMode && picked.has(i) ? ' chk' : ''}`;
-    // 上から: 種族名の最初の6文字 / 7文字目以降と Lv / 食材3つ / ニックネーム
-    return `<button type="button" class="${cls}" data-i="${i}" aria-label="${esc(label(a))}、Lv${a[2] ?? '?'}"><b class="c-n1">${esc(nm.first)}</b><span class="c-row2"><b class="c-n2">${esc(nm.rest)}</b><span class="c-lv"><i>Lv</i>${a[2] ?? '?'}</span></span><span class="c-ing">${ings}</span><span class="c-nick">${esc(a[0]) || '&nbsp;'}</span></button>`;
+    const isSel = !selectMode && selected === i;
+    const cls = `cell${flag ? ' flag' : ''}${isSel ? ' sel' : ''}${selectMode && picked.has(i) ? ' chk' : ''}`;
+    // 上から: Lv / 色の四角アイコン / ニックネーム(なければ種族名)
+    return `<button type="button" class="${cls}" data-i="${i}" aria-label="${esc(label(a))}、Lv${a[2] ?? '?'}${a[7] === 1 ? '、色違い' : ''}"><span class="c-hd"><i>Lv.</i>${a[2] ?? '?'}</span><span class="c-ic">${iconSvg(a[1], a[7] === 1)}</span><span class="c-nm">${esc(a[0] || a[1] || '(未設定)')}</span><span class="c-k" aria-hidden="true">⋮</span></button>`;
   }
 
   function renderGrid() {
@@ -126,6 +140,8 @@ const BoxUi = (() => {
     for (const id of ['box-restore', 'box-clear']) g(id).disabled = total === 0;
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
     g('sel-start').disabled = total === 0;
+    g('sort-open').textContent = SORTS.find((x) => x[0] === sortKey)[1];
+    g('sort-dir').textContent = reverse ? '↑' : '↓';
     const fb2 = g('filter-open');
     fb2.textContent = filtering ? '🔍 ON' : '🔍 OFF';
     fb2.classList.toggle('on', filtering);
@@ -157,14 +173,15 @@ const BoxUi = (() => {
     const wrap = g('box-grid-wrap');
     const left = Math.max(0, Math.min(cell.offsetLeft, wrap.clientWidth - menu.offsetWidth));
     menu.style.left = `${left}px`;
-    menu.style.top = `${cell.offsetTop + cell.offsetHeight + 4}px`;
+    menu.style.top = `${cell.offsetTop + cell.offsetHeight - 4}px`;
+    g('cell-move-label').textContent = `${nameOf(3 - active)}へ移動`;
   }
 
   function closeMenus() {
     if (selected !== null) { selected = null; for (const c of g('box-grid').querySelectorAll('.cell.sel')) c.classList.remove('sel'); }
     g('box-cell-menu').hidden = true;
-    g('box-more').hidden = true;
-    g('box-more-btn').setAttribute('aria-expanded', 'false');
+    for (const id of ['box-more', 'csv-menu', 'sort-menu']) g(id).hidden = true;
+    for (const id of ['box-more-btn', 'csv-open', 'sort-open']) g(id).setAttribute('aria-expanded', 'false');
   }
 
   function selectCell(i) {
@@ -190,6 +207,51 @@ const BoxUi = (() => {
       } },
       { label: 'やめる' },
     ]);
+  }
+
+  // 画面の下に一言だけ出す(2秒で消える)
+  let toastTimer = 0;
+  function toast(text) {
+    const t = g('toast');
+    t.textContent = text;
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 2500);
+  }
+
+  // メニューの「BOXへ移動」: もう一方の BOX へ1匹移す。入らなければ移さず、理由を出す
+  function moveCell() {
+    const i = selected, from = active, to = 3 - active;
+    if (i === null) return;
+    closeMenus();
+    const plan = Box.canMove(1, boxes[to - 1].rows.length);
+    if (!plan.fits) { ask(`${esc(nameOf(to))}は${Box.MAX}匹までで、いっぱいです。1匹も移せません。`, [{ label: '閉じる' }]); return; }
+    const dst = boxes[to - 1], src = boxes[from - 1];
+    if (!Box.save(to, { name: dst.name, rows: dst.rows.concat(Box.pick(src.rows, [i])) })) { toast('保存できませんでした。端末の空き容量を確かめてください。'); return; }
+    if (!Box.save(from, { name: src.name, rows: Box.removeAt(src.rows, i) })) {
+      Box.save(to, { name: dst.name, rows: dst.rows }); // 元に戻す(二重にならないように)
+      toast('保存できませんでした。端末の空き容量を確かめてください。');
+      return;
+    }
+    boxes[to - 1] = Box.load(to);
+    boxes[from - 1] = Box.load(from);
+    renderAll();
+    renderSave(okNow());
+    toast(`1匹を${nameOf(to)}へ移しました。`);
+  }
+
+  // メニューの「複製」: 同じ個体を、このBOXの最後に1匹足す
+  function duplicateCell() {
+    const i = selected;
+    if (i === null) return;
+    closeMenus();
+    const data = boxes[active - 1];
+    if (!Box.canMove(1, data.rows.length).fits) { ask(`${esc(nameOf(active))}は${Box.MAX}匹までで、いっぱいです。複製できません。`, [{ label: '閉じる' }]); return; }
+    if (!Box.save(active, { name: data.name, rows: Box.duplicate(data.rows, i) })) { toast('保存できませんでした。端末の空き容量を確かめてください。'); return; }
+    boxes[active - 1] = Box.load(active);
+    renderAll();
+    renderSave(okNow());
+    toast('複製しました(いちばん最後に追加しています)。');
   }
 
   // ---------- 個体の編集画面(全画面のシート) ----------
@@ -396,8 +458,7 @@ const BoxUi = (() => {
 
   async function copy() {
     await writeClipboard(Box.csv(boxes[active - 1].rows));
-    g('box-copy').textContent = 'コピーしました';
-    setTimeout(() => { g('box-copy').textContent = 'CSVをコピー'; }, 1500);
+    toast('CSVをコピーしました。');
   }
 
   function file() {
@@ -637,8 +698,11 @@ const BoxUi = (() => {
   // 絞り込みをすべて外す(並べ替えは追加順に戻す)
   function clearFilter() {
     g('box-filter').value = '';
-    g('box-ing').value = '';
-    g('box-sort').value = 'added';
+    ingSel = '';
+    sortKey = 'added';
+    reverse = false;
+    nickOnly = false;
+    g('filter-nick').checked = false;
     typesSel = new Set();
     subsSel = new Set();
     onlyFlag = false;
@@ -648,11 +712,25 @@ const BoxUi = (() => {
   function renderChips() {
     for (const c of g('filter-types').children) c.setAttribute('aria-pressed', String(typesSel.has(c.dataset.type)));
     for (const c of g('filter-subs').children) c.setAttribute('aria-pressed', String(subsSel.has(c.dataset.sub)));
+    for (const c of g('filter-ings').children) c.setAttribute('aria-pressed', String(ingSel === c.dataset.ing));
+    for (const c of g('filter-sorts').children) c.setAttribute('aria-pressed', String(sortKey === c.dataset.sort));
+    // 項目の見出しに、いま絞っている数を出す
+    const counts = { type: typesSel.size, ing: ingSel ? 1 : 0, sub: subsSel.size, nick: nickOnly ? 1 : 0 };
+    const names = { type: 'タイプ', ing: '食材', sub: 'サブスキル', nick: 'ニックネーム' };
+    for (const t of g('filter-tabs').children) t.textContent = counts[t.dataset.ft] ? `${names[t.dataset.ft]}(${counts[t.dataset.ft]})` : names[t.dataset.ft];
   }
   // タイプ・サブスキル(白・青・金の順)の選択肢を作る
   function buildChips() {
     g('filter-types').innerHTML = POKEMON_TYPES.map(([k, label]) => `<button type="button" class="chip" data-type="${k}" aria-pressed="false">${esc(label)}</button>`).join('');
+    g('filter-ings').innerHTML = INGREDIENTS.map((n) => `<button type="button" class="chip ing" data-ing="${esc(n)}" aria-pressed="false"><span class="ico xs">${INGREDIENT_ICONS[n] ?? ''}</span>${esc(n)}</button>`).join('');
+    g('filter-sorts').innerHTML = SORTS.map(([k, label]) => `<button type="button" class="chip" data-sort="${k}" aria-pressed="false">${esc(label)}</button>`).join('');
+    g('sort-menu').innerHTML = SORTS.map(([k, label]) => `<button type="button" role="menuitem" data-sort="${k}">${esc(label)}</button>`).join('');
     g('filter-subs').innerHTML = ['white', 'blue', 'gold'].flatMap((color) => SUBSKILL_COLORS[color].map((name) => `<button type="button" class="chip ${color}" data-sub="${esc(name)}" aria-pressed="false">${esc(name)}</button>`)).join('');
+  }
+
+  function showFilterTab(ft) {
+    for (const t of g('filter-tabs').children) t.setAttribute('aria-selected', String(t.dataset.ft === ft));
+    for (const p of g('filter-dialog').querySelectorAll('.fpanel')) p.hidden = p.dataset.fp !== ft;
   }
 
   function init() {
@@ -675,6 +753,18 @@ const BoxUi = (() => {
       subsSel = subsSel.has(c.dataset.sub) ? new Set([...subsSel].filter((x) => x !== c.dataset.sub)) : new Set([...subsSel, c.dataset.sub]);
       renderChips(); firstPage();
     });
+    g('filter-tabs').addEventListener('click', (ev) => { const t = ev.target.closest('[data-ft]'); if (t) showFilterTab(t.dataset.ft); });
+    g('filter-ings').addEventListener('click', (ev) => {
+      const c = ev.target.closest('[data-ing]');
+      if (!c) return;
+      ingSel = ingSel === c.dataset.ing ? '' : c.dataset.ing;
+      renderChips(); firstPage();
+    });
+    g('filter-nick').addEventListener('change', () => { nickOnly = g('filter-nick').checked; renderChips(); firstPage(); });
+    const setSort = (k) => { sortKey = k; renderChips(); firstPage(); };
+    g('filter-sorts').addEventListener('click', (ev) => { const c = ev.target.closest('[data-sort]'); if (c) setSort(c.dataset.sort); });
+    g('sort-menu').addEventListener('click', (ev) => { const c = ev.target.closest('[data-sort]'); if (c) { closeMenus(); setSort(c.dataset.sort); } });
+    g('sort-dir').addEventListener('click', () => { reverse = !reverse; firstPage(); });
     // 上のタブ
     g('tab-import').addEventListener('click', () => setTab('import'));
     g('tab-box').addEventListener('click', () => setTab('box'));
@@ -692,10 +782,7 @@ const BoxUi = (() => {
       g('box-import-done').textContent = '';
       renderAll();
     });
-    g('box-ing').innerHTML = '<option value="">食材</option>' + INGREDIENTS.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
     g('box-filter').addEventListener('input', firstPage);
-    g('box-ing').addEventListener('change', firstPage);
-    g('box-sort').addEventListener('change', firstPage);
     g('box-flag').addEventListener('click', () => { onlyFlag = !onlyFlag; firstPage(); });
     // 箱をタップしたメニュー(編集・削除)
     g('box-grid').addEventListener('click', (ev) => {
@@ -724,23 +811,28 @@ const BoxUi = (() => {
     g('ask-dialog').addEventListener('close', () => document.documentElement.classList.remove('modal-open'));
     g('cell-edit').addEventListener('click', () => { const i = selected; if (i !== null) openSheet(i); });
     g('cell-delete').addEventListener('click', deleteCell);
+    g('cell-move').addEventListener('click', moveCell);
+    g('cell-dup').addEventListener('click', duplicateCell);
     // メニューの外を押すと閉じる
     document.addEventListener('click', (ev) => {
-      if (!ev.target.closest('.cell, #box-cell-menu, #box-more, #box-more-btn')) closeMenus();
+      if (!ev.target.closest('.cell, #box-cell-menu, #box-more, #box-more-btn, #csv-menu, #csv-open, #sort-menu, #sort-open')) closeMenus();
     });
     // ⋯ のメニュー
-    g('box-more-btn').addEventListener('click', (ev) => {
+    const toggleMenu = (btnId, menuId) => g(btnId).addEventListener('click', (ev) => {
       ev.stopPropagation();
-      const open = g('box-more').hidden;
+      const open = g(menuId).hidden;
       closeMenus();
-      g('box-more').hidden = !open;
-      g('box-more-btn').setAttribute('aria-expanded', String(open));
+      g(menuId).hidden = !open;
+      g(btnId).setAttribute('aria-expanded', String(open));
     });
+    toggleMenu('box-more-btn', 'box-more');
+    toggleMenu('csv-open', 'csv-menu');
+    toggleMenu('sort-open', 'sort-menu');
     g('box-rename').addEventListener('click', () => { closeMenus(); rename(); });
     g('box-file').addEventListener('click', () => { closeMenus(); file(); });
     g('box-restore').addEventListener('click', () => { closeMenus(); restore(); });
     g('box-clear').addEventListener('click', () => { closeMenus(); clear(); });
-    g('box-copy').addEventListener('click', copy);
+    g('box-copy').addEventListener('click', () => { closeMenus(); copy(); });
     // 編集画面(全画面)。入力・進化・種族の検索は、3の行と同じ処理
     bindRowEvents(g('box-sheet'));
     g('box-sheet').addEventListener('click', (ev) => {

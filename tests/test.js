@@ -405,6 +405,28 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('絞り込み中でも、要確認の数はBOX全体で数える', (() => { const arr = [mk(fire, 0), mk('ふしぎ', 1), mk(water, 2)]; return Box.view(arr, { types: ['fire'] }).flagged === arr.filter(Box.needsCheck).length; })(), true);
 }
 
+// 色の四角アイコン・図鑑番号順・向きの逆・ニックネームだけ・複製
+{
+  const mk = (species, i, nick = '') => Box.pack(row({ nickname: nick, species, level: 10 + i }));
+  eq('色の四角アイコンは全種族にある', POKEMON.filter((p) => !POKE_ICONS[p.name]).map((p) => p.name), []);
+  eq('アイコンの形: 通常色・色違いの色・四角たち', (() => { const d = POKE_ICONS['ピカチュウ']; return [d[0].length > 0, d[1].length === d[0].length, d[2].length > 0 && d[2][0].length === 6]; })(), [true, true, true]);
+  eq('色違い用の色は、通常色と違う種族がある', POKEMON.some((p) => POKE_ICONS[p.name][0].join() !== POKE_ICONS[p.name][1].join()), true);
+  eq('バケッチャ(こだましゅ)と(ギガだましゅ)は別のアイコン', POKE_ICONS['バケッチャ(こだましゅ)'][2].length >= 1 && JSON.stringify(POKE_ICONS['バケッチャ(こだましゅ)']) !== JSON.stringify(POKE_ICONS['バケッチャ(ギガだましゅ)']), true);
+
+  const rows = [mk('ミュウ', 0, 'ゆめ'), mk('フシギダネ', 1), mk('ピカチュウ', 2), mk('ふしぎ', 3)];
+  eq('図鑑番号順(データにない名前は最後)', Box.view(rows, { sort: 'dex' }).items.map((x) => x.i), [1, 2, 0, 3]);
+  eq('向きを逆にする(追加順)', Box.view(rows, { reverse: true }).items.map((x) => x.i), [3, 2, 1, 0]);
+  eq('向きを逆にする(レベル順は低い順に)', Box.view(rows, { sort: 'level', reverse: true }).items.map((x) => x.i), [0, 1, 2, 3]);
+  eq('ニックネームをつけた個体だけ', Box.view(rows, { nicknamed: true }).items.map((x) => x.i), [0]);
+  eq('図鑑番号の引き方', [Box.noOf('フシギダネ'), Box.noOf('ふしぎ')], [1, 1e9]);
+
+  const dup = Box.duplicate(rows, 0);
+  eq('複製は末尾に同じ個体を足す', [dup.length, JSON.stringify(dup[4]) === JSON.stringify(dup[0])], [5, true]);
+  dup[4][6][0] = 'x';
+  eq('複製は元の個体とは別物(サブスキルを共有しない)', dup[0][6][0] === 'x', false);
+  eq('複製しても元の並びは変わらない', rows.length, 4);
+}
+
 // CSV・TSV の読み込み
 {
   const pick = (r) => ({ nickname: r.nickname, species: r.species, level: r.level, skillLevel: r.skillLevel, ing: r.ing, nature: r.nature, sub: r.sub, shiny: r.shiny, mint: r.mint, ribbon: r.ribbon });
