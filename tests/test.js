@@ -464,7 +464,7 @@ eq('両方に入らないこともある', Box.plan(100, [250, 280]).map((x) => 
   eq('系統が1つなら最終進化を自動で選ぶ(ミミッキュ)', Match.guessSpecies(MAIN_SKILLS['ミミッキュ'], clueOf('ミミッキュ')), { kind: 'single', species: 'ミミッキュ', options: ['ミミッキュ'] });
   eq('進化前のスキル・食材でも最終進化(ムウマ → ムウマージ)', Match.guessSpecies(MAIN_SKILLS['ムウマ'], { ...clueOf('ムウマ'), color: null }).species ?? Match.guessSpecies(MAIN_SKILLS['ムウマ'], clueOf('ムウマ')).options[0], 'ムウマージ');
   const g = Match.guessSpecies(MAIN_SKILLS['フシギダネ'], clueOf('フシギダネ'));
-  eq('食材の絵がはっきり合わない系統は外す(フシギダネ: リザードンは外れる)', [g.kind, g.ranked, g.options[0], g.options.includes('リザードン')], ['choose', true, 'フシギバナ', false]);
+  eq('食材の絵がはっきり合わない系統は外す(フシギダネ: リザードンは外れる)', [g.kind, g.ranked, g.options[0], g.options.includes('リザードン')], ['single', true, 'フシギバナ', false]);
   const wrong = { up: { name: '青', pct: 90 }, down: { name: '紫', pct: 90 } };
   eq('絵の読み取りが大きく外れているときは外さない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), color: [wrong, wrong] }).options.includes('リザードン'), true);
   const yadon = Match.guessSpecies(MAIN_SKILLS['ヤドン'], { amount: [1, 2], s21: null, s31: null, s32: null, color: [colorOf('おいしいシッポ'), colorOf('おいしいシッポ')] });

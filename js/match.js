@@ -419,7 +419,10 @@ const Match = (() => {
         }
       }
     }
-    return { kind: 'choose', options: order.flatMap((r) => finals(r)).slice(0, MAX_OPTIONS), ranked, colored, shinyGuess };
+    const options = order.flatMap((r) => finals(r)).slice(0, MAX_OPTIONS);
+    // 絞り込みで1種だけ残ったら、選んでもらわずに入れる(オレンジ枠で確認を促す)
+    if (options.length === 1) return { kind: 'single', species: options[0], options, ranked, colored, shinyGuess };
+    return { kind: 'choose', options, ranked, colored, shinyGuess };
   }
 
   // 読み取った文字からスキルレベルを取り出す。1桁で1〜8だけを認める。
