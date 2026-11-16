@@ -46,11 +46,10 @@ const Box = (() => {
   }
   const bytes = (n) => { try { const raw = localStorage.getItem(key(n)); return raw === null ? 0 : (key(n).length + raw.length) * 2; } catch (e) { return 0; } };
 
-  // count 匹を各 BOX に保存できるか。overwrite はその BOX の中身を置き換える(3へ戻した元の BOX)
-  // 返す値: BOX ごとの { fits, room }。room は追加で入る数(上書きなら 300)
-  function plan(count, lengths, overwrite = 0) {
-    return lengths.map((len, i) => {
-      const room = overwrite === i + 1 ? MAX : MAX - len;
+  // count 匹を各 BOX に保存できるか。返す値: BOX ごとの { fits, room }。room は追加で入る数
+  function plan(count, lengths) {
+    return lengths.map((len) => {
+      const room = MAX - len;
       return { fits: count <= room, room };
     });
   }

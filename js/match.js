@@ -58,7 +58,27 @@ const Match = (() => {
     return p ? p.myth ?? p.ing : null;
   }
 
-  const nature = (text) => result(best(text, NATURES, loose));
+  // 性格。OCRが文字を足して読むことがある(「おくびょう」→「おくびぴびょう」)ので、
+  // 近似一致で決まらなければ、辞書の名前が(間に文字を挟んでも)順に含まれ、足された文字が2字までで、1つに決まるものを採る
+  function nature(text) {
+    const m = best(text, NATURES, loose);
+    if (m) return result(m);
+    const t = [...fold(text)];
+    // 頭の3文字が1つの性格にだけ一致すれば採る(25種の頭3文字は、小書き文字をそろえても重ならない)
+    if (t.length >= 3) {
+      const head = t.slice(0, 3).join('');
+      const same = NATURES.filter((n) => [...fold(n)].slice(0, 3).join('') === head);
+      if (same.length === 1) return { value: same[0], confidence: 'low' };
+    }
+    const hits = NATURES.filter((n) => {
+      const f = [...fold(n)];
+      if (f.length < 4 || t.length > f.length + 2) return false;
+      let i = 0;
+      for (const ch of t) if (ch === f[i]) i++;
+      return i === f.length;
+    });
+    return hits.length === 1 ? { value: hits[0], confidence: 'low' } : result(null);
+  }
 
   // サブスキルは背景色ごとに候補が決まる。S/Mの読み違いをここで防ぐ
   function subskill(text, color) {
@@ -195,12 +215,23 @@ const Match = (() => {
   const skillKey = (name) => fold(String(name ?? '').replace(/[$¥].*$/, '').replace(/[(（]ランダム[)）]/g, ''));
   const SKILL_KEYS = typeof MAIN_SKILLS === 'undefined' ? [] : [...new Set(Object.values(MAIN_SKILLS).map(skillKey))];
 
+  // 詳細画面に出うる2枠目・3枠目の個数(どれかの種族の表にある値)
+  const AMOUNTS2 = new Set(POKEMON.flatMap((p) => (p.amt ? [p.amt[0], p.amt[1]] : [])));
+  const AMOUNTS3 = new Set(POKEMON.flatMap((p) => (p.amt ? [p.amt[2], p.amt[3], p.amt[4]] : [])));
+
   // 読み取ったスキル名を、辞書のスキル名のどれかに直す。決まらなければ ''
   function skillOf(text) {
     const k = skillKey(text);
     if (!k) return '';
     if (SKILL_KEYS.includes(k)) return k;
-    // 括弧の中(ばけのかわ(きのみバースト) など)の読み違いは、前の部分が合えばよいことにする
+    // カッコ付きの名前(はどうだん(ゆめのかけらゲットS) など)は、カッコの前の部分が、ちょうど1つのスキルに当たればそれにする。
+    // カッコの中の読み違いや、末尾のゴミに左右されない
+    const lead = k.split('(')[0];
+    if (lead && lead.length >= 3) {
+      const byLead = SKILL_KEYS.filter((x) => x.split('(')[0] === lead);
+      if (byLead.length === 1) return byLead[0];
+    }
+    // 括弧の中の読み違いは、前の部分が合えばよいことにする
     const head = SKILL_KEYS.filter((x) => k.startsWith(x) || x.startsWith(k));
     if (head.length === 1) return head[0];
     const m = best(k, SKILL_KEYS, (len) => (len <= 6 ? 0 : 1));
@@ -228,7 +259,9 @@ const Match = (() => {
     const known = (v) => v !== null && v !== undefined;
     const flag = (v) => (known(v) ? v >= SAME : null);
     const eq21 = flag(clues?.s21), eq31 = flag(clues?.s31), eq32 = flag(clues?.s32);
-    const [n2, n3] = clues?.amount ?? [null, null];
+    // どの種族の表にもない個数(「x1」を「14」と読んだ、など)は、読めなかったものとして使わない
+    const [r2, r3] = clues?.amount ?? [null, null];
+    const n2 = AMOUNTS2.has(r2) ? r2 : null, n3 = AMOUNTS3.has(r3) ? r3 : null;
     const berry = berryType(clues?.berry);
     const found = POKEMON.filter((p) => {
       if (p.myth) return false;
@@ -258,18 +291,80 @@ const Match = (() => {
   // 系統(進化のもと)ごとにまとめる
   const rootOf = (name) => { let r = name; while (parentOf[r]) r = parentOf[r]; return r; };
 
-  // 2枠目・3枠目の絵(色の特徴)が、その種族の食材のどれかの組み合わせにどれだけ合うか。小さいほど合う。特徴がなければ null
-  const featDist = (a, b) => Math.hypot(...a.map((t, i) => t - b[i]));
-  function ingredientFit(name, feats) {
-    if (typeof ING_FEAT === 'undefined' || !feats || !feats[0] || !feats[1]) return null;
+  // 2枠目・3枠目の絵(上下の主な色)が、その種族の食材のどれかの組み合わせにどれだけ合うか。小さいほど合う。色がなければ null。
+  // 食材の表(data/ingcolor.js)の、上と下それぞれの主な色の名前が違えば 100、同じなら割合の差(0〜100)を足す。
+  // 表にない食材や、名札に隠れて取れない側は数えない
+  const COLOR_MISMATCH = 100;
+  // ref の5つ目は、縮小した画像などで色の名前が変わる場合の、もう1つの表(同じ並び)
+  function colorDist(obs, ref) {
+    const one = (r) => {
+      let d = 0;
+      [[obs.up, r[0], r[2]], [obs.down, r[1], r[3]]].forEach(([o, name, pct]) => {
+        if (!name || !o || o.name === 'なし') return;
+        d += o.name === name ? (pct === null || pct === undefined ? 0 : Math.abs(o.pct - pct)) : COLOR_MISMATCH;
+      });
+      return d;
+    };
+    return ref[4] ? Math.min(one(ref), one(ref[4])) : one(ref);
+  }
+  function ingredientFit(name, colors) {
+    if (typeof INGREDIENT_COLORS === 'undefined' || !colors || !colors[0] || !colors[1]) return null;
     let top = null;
     for (const c of combos(name)) {
-      const f2 = ING_FEAT[c.ing[1]], f3 = ING_FEAT[c.ing[2]];
-      if (!f2 || !f3) continue;
-      const d = featDist(feats[0], f2) + featDist(feats[1], f3);
+      const r2 = INGREDIENT_COLORS[c.ing[1]], r3 = INGREDIENT_COLORS[c.ing[2]];
+      if (!r2 || !r3) continue;
+      const d = colorDist(colors[0], r2) + colorDist(colors[1], r3);
       if (top === null || d < top) top = d;
     }
     return top;
+  }
+
+  // ポケモンの姿の色(Lab)と、色の四角アイコン(data/pokeicons.js の通常色)の比べ合い。小さいほど合う。
+  // 姿の各画素から、アイコンのいちばん近い色までの距離の平均 + アイコンの各色から、姿のいちばん近い画素までの距離(下位5%)を面積で重みづけして足したもの。
+  // 明るさの差は半分に見る(姿には陰影があるため)
+  const lab = ([r, g, b]) => {
+    const f = (c) => { c /= 255; return c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92; };
+    const [R, G, B] = [f(r), f(g), f(b)];
+    const X = (R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047, Y = R * 0.2126 + G * 0.7152 + B * 0.0722, Z = (R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883;
+    const u = (v) => (v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116);
+    return [116 * u(Y) - 16, 500 * (u(X) - u(Y)), 200 * (u(Y) - u(Z))];
+  };
+  const palettes = {};
+  function palette(name, shiny = false) {
+    const key = shiny ? `色違い:${name}` : name;
+    if (palettes[key] !== undefined) return palettes[key];
+    const d = typeof POKE_ICONS === 'undefined' ? null : POKE_ICONS[name];
+    if (!d) return (palettes[key] = null);
+    const N = 48, grid = new Array(N * N).fill(-1);
+    for (const [x, y, w, h, r, c] of d[2]) {
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const px = (i + 0.5) / N, py = (j + 0.5) / N;
+        if (px < x || px > x + w || py < y || py > y + h) continue;
+        if (r) { const cx = Math.min(Math.max(px, x + r), x + w - r), cy = Math.min(Math.max(py, y + r), y + h - r); if (Math.hypot(px - cx, py - cy) > r) continue; }
+        grid[j * N + i] = c;
+      }
+    }
+    const area = d[0].map(() => 0);
+    for (const c of grid) if (c >= 0) area[c]++;
+    const total = area.reduce((a, b) => a + b, 0);
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return (palettes[key] = total ? d[shiny ? 1 : 0].map((h, i) => ({ lab: lab(rgb(h)), w: area[i] / total })).filter((p) => p.w > 0) : null);
+  }
+  const dE = (a0, a1, a2, b) => Math.hypot((a0 - b[0]) * 0.5, a1 - b[1], a2 - b[2]);
+  // sprite: 姿の画素の Lab を3つずつ並べた配列(reader.js の spriteLab)
+  function spriteScore(sprite, name, shiny = false) {
+    const pal = palette(name, shiny);
+    if (!pal || !sprite || sprite.length < 90) return null;
+    const n = sprite.length / 3;
+    let a = 0;
+    const per = pal.map(() => []);
+    for (let i = 0; i < n; i++) {
+      let m = Infinity;
+      pal.forEach((c, j) => { const e = dE(sprite[3 * i], sprite[3 * i + 1], sprite[3 * i + 2], c.lab); per[j].push(e); if (e < m) m = e; });
+      a += m;
+    }
+    const b = pal.reduce((s, c, j) => { const ds = per[j].sort((x, y) => x - y); return s + c.w * ds[Math.floor(ds.length * 0.05)]; }, 0);
+    return a / n + b;
   }
 
   // 推定の結果。
@@ -277,8 +372,12 @@ const Match = (() => {
   //   { kind: 'choose', options, ranked } 選んでもらう。系統が1つで最終進化が複数(イーブイなど)か、複数の系統が残った場合。
   //     複数の系統は、食材の絵が合う順に並べる(ranked が true なら絵で並べた)
   //   { kind: 'none', options: [] } 決められない
-  const MAX_OPTIONS = 12, FIT_MARGIN = 15, FIT_TRUST = 60;
-  function guessSpecies(skillName, clues) {
+  const MAX_OPTIONS = 12;
+  // 外す・入れ替える基準(測り直して決める): margin 1位からこれ以上離れた系統を外す / trust 1位の点がこれより大きければ絵の読み取りが外れているので外さない /
+  // sprite 姿の色で1位になった系統を先頭に出すのに、2位との差が最低これだけ要る
+  const tune = { margin: 40, trust: 60, sprite: 3, shiny: 8 };
+  // opts.shiny: 色違いの個体(姿の色が通常色と違うので、姿の色は使わない)
+  function guessSpecies(skillName, clues, opts = {}) {
     const names = candidates(skillName, clues);
     if (!names.length) return { kind: 'none', options: [] };
     const roots = [...new Set(names.map(rootOf))];
@@ -289,18 +388,38 @@ const Match = (() => {
     // 複数の系統: 系統ごとに、食材の絵が一番合う種族の点で並べる
     const fit = new Map();
     for (const r of roots) {
-      const scores = names.filter((n) => rootOf(n) === r).map((n) => ingredientFit(n, clues?.feat)).filter((v) => v !== null);
+      const scores = names.filter((n) => rootOf(n) === r).map((n) => ingredientFit(n, clues?.color)).filter((v) => v !== null);
       fit.set(r, scores.length ? Math.min(...scores) : null);
     }
     const ranked = roots.every((r) => fit.get(r) !== null);
     let order = ranked ? roots.slice().sort((x, y) => fit.get(x) - fit.get(y)) : roots;
     // 絵がはっきり合わない系統は外す。手元の標本で、正解の系統の差は最大でも10。余裕を見て15離れたら外す。
     // 1位の点が大きすぎるときは絵の読み取り自体が外れているので、外さない
-    if (ranked && fit.get(order[0]) <= FIT_TRUST) {
-      const kept = order.filter((r) => fit.get(r) <= fit.get(order[0]) + FIT_MARGIN);
-      order = kept; // 1つに絞れても自動では入れない(絵の判定だけで決めるのは危ないので、選んでもらう)
+    if (ranked && fit.get(order[0]) <= tune.trust) {
+      order = order.filter((r) => fit.get(r) <= fit.get(order[0]) + tune.margin); // 1つに絞れても自動では入れない(絵だけで決めるのは危ないので、選んでもらう)
     }
-    return { kind: 'choose', options: order.flatMap((r) => finals(r)).slice(0, MAX_OPTIONS), ranked };
+    // ポケモンの姿の色で、先頭の系統を入れ替える。色違いの個体には使わない。2位との差が小さいときは今の並びを残す(並べ替えるだけで、外しも決めもしない)
+    // 候補の色違いの色のほうが、通常色よりずっと合うときは、色違いの個体とみなして姿の色を使わない(shinyGuess)
+    let colored = false, shinyGuess = false;
+    if (!opts.shiny && clues?.sprite && order.length > 1) {
+      const pool = [...new Set(order.flatMap((r) => [...names.filter((n) => rootOf(n) === r), ...finals(r)]))];
+      const bestOf = (shiny) => Math.min(...pool.map((n) => spriteScore(clues.sprite, n, shiny)).filter((v) => v !== null), Infinity);
+      shinyGuess = bestOf(true) + tune.shiny <= bestOf(false);
+    }
+    if (!opts.shiny && !shinyGuess && clues?.sprite && order.length > 1) {
+      const sc = order.map((r) => {
+        const own = [...names.filter((n) => rootOf(n) === r), ...finals(r)].map((n) => spriteScore(clues.sprite, n)).filter((v) => v !== null);
+        return own.length ? Math.min(...own) : null;
+      });
+      if (sc.every((v) => v !== null)) {
+        const sorted = sc.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]);
+        if (sorted[1][0] - sorted[0][0] >= tune.sprite && sorted[0][1] !== 0) {
+          order = [order[sorted[0][1]], ...order.filter((_, i) => i !== sorted[0][1])];
+          colored = true;
+        }
+      }
+    }
+    return { kind: 'choose', options: order.flatMap((r) => finals(r)).slice(0, MAX_OPTIONS), ranked, colored, shinyGuess };
   }
 
   // 読み取った文字からスキルレベルを取り出す。1桁で1〜8だけを認める。
@@ -375,5 +494,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { berryType, ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
+  return { tune, lab, colorDist, spriteScore, berryType, ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();

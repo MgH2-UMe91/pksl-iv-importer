@@ -1,12 +1,11 @@
 // BOX の画面。保存ボタン(取込みタブの4)と、BOX タブ(箱の並び・箱のメニュー・個体の編集画面・CSV の読み込み)
 // ホーム画面に追加したアプリ(standalone)でだけ使える。ブラウザで開いたときは、保存ボタンを灰色にして、BOX タブには案内だけを出す
-// app.js の state・loadRows・esc・ingredientField・evolutionField・selectField などを使うので、app.js より前に読み込み、app.js の最後で BoxUi.init() を呼ぶ
+// app.js の state・esc・ingredientField・evolutionField・selectField などを使うので、app.js より前に読み込み、app.js の最後で BoxUi.init() を呼ぶ
 'use strict';
 
 const BoxUi = (() => {
   let boxes = [Box.load(1), Box.load(2)];
   let active = 1;        // BOX タブで見ている BOX
-  let restoredFrom = 0;  // 3 へ戻した元の BOX(0 なら戻していない)
   let onlyFlag = false;  // 要確認の個体だけを表示しているか
   let selected = null;   // 箱をタップして、メニューを出している個体の番号
   let selectMode = false; // 複数選択のモードか
@@ -18,10 +17,9 @@ const BoxUi = (() => {
   let reverse = false;      // 並べ替えの向きを逆にしているか(↓ が通常、↑ が逆)
   let picked = new Set(); // 複数選択で選んでいる個体の番号
   let sheet = null;      // 開いている編集画面 { idx, row, order, timer }
-  let savedSig = '';     // 最後に保存した(または戻した)ときの 3 の中身。違えば「保存していない行がある」
+  let savedSig = '';     // 最後に保存したときの 3 の中身。違えば保存結果の表示を消す
   const enabled = () => Install.standalone();
   const sig = () => JSON.stringify(state.rows.map(Box.pack));
-  const unsaved = () => state.rows.length > 0 && sig() !== savedSig;
   const nameOf = (n) => Box.nameOf(boxes[n - 1], n);
   const g = (id) => document.getElementById(id);
   const okNow = () => !g('copy').disabled;
@@ -54,10 +52,10 @@ const BoxUi = (() => {
     }
     g('box-browser').hidden = true;
     g('box-save-2').hidden = false;
-    const plan = Box.plan(count, boxes.map((b) => b.rows.length), restoredFrom);
+    const plan = Box.plan(count, boxes.map((b) => b.rows.length));
     for (const n of [1, 2]) {
       const b = g(`box-save-${n}`);
-      b.textContent = `${nameOf(n)} に${restoredFrom === n ? '上書き保存' : '保存'}(${boxes[n - 1].rows.length}/${Box.MAX})`;
+      b.textContent = `${nameOf(n)} に保存(${boxes[n - 1].rows.length}/${Box.MAX})`;
       b.disabled = !ok || count === 0 || !plan[n - 1].fits;
     }
     // 入りきらないBOXがあるときは、理由を出す(ポップアップは使わない)
@@ -67,9 +65,7 @@ const BoxUi = (() => {
       warn = `どちらのBOXにも入りません(1つのBOXは${Box.MAX}匹までです)。${count}匹を減らしてから保存してください。`;
     } else if (count > 0 && no.length === 1) {
       const n = no[0], other = 3 - n;
-      warn = restoredFrom === n
-        ? `${nameOf(n)}は${Box.MAX}匹までです。${count}匹は上書きできないので、${nameOf(other)}へ保存してください。`
-        : `${nameOf(n)}にはあと${plan[n - 1].room}匹しか入りません。${count}匹は入らないので、${nameOf(other)}へ保存してください。`;
+      warn = `${nameOf(n)}にはあと${plan[n - 1].room}匹しか入りません。${count}匹は入らないので、${nameOf(other)}へ保存してください。`;
     }
     g('box-save-warn').textContent = warn;
     if (sig() !== savedSig) g('box-save-result').textContent = '';
@@ -78,8 +74,7 @@ const BoxUi = (() => {
   function save(n) {
     const count = state.rows.length;
     const packed = state.rows.map(Box.pack);
-    const overwrite = restoredFrom === n;
-    const rows = overwrite ? packed : boxes[n - 1].rows.concat(packed);
+    const rows = boxes[n - 1].rows.concat(packed);
     if (rows.length > Box.MAX) return; // ボタンは灰色のはずだが、念のため
     if (!Box.save(n, { name: boxes[n - 1].name, rows })) {
       g('box-save-result').textContent = '保存できませんでした。端末の空き容量や、ブラウザの設定を確かめてください。';
@@ -87,7 +82,7 @@ const BoxUi = (() => {
     }
     boxes[n - 1] = Box.load(n);
     savedSig = sig();
-    g('box-save-result').textContent = overwrite ? `${nameOf(n)}に${count}匹を上書き保存しました。` : `${nameOf(n)}に${count}匹追加しました。`;
+    g('box-save-result').textContent = `${nameOf(n)}に${count}匹追加しました。`;
     renderAll();
     renderSave(true);
   }
@@ -137,7 +132,7 @@ const BoxUi = (() => {
     const filtering = isFiltering();
     g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${v.total}匹中${v.count}匹を表示` : `${total}匹`)
       + (data.broken ? '(一部を読めませんでした)' : '');
-    for (const id of ['box-restore', 'box-clear']) g(id).disabled = total === 0;
+    g('box-clear').disabled = total === 0;
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
     g('sel-start').disabled = total === 0;
     g('sort-open').textContent = SORTS.find((x) => x[0] === sortKey)[1];
@@ -432,24 +427,6 @@ const BoxUi = (() => {
       } },
       { label: 'やめる' },
     ], 'box-name');
-  }
-
-  function restore() {
-    const n = active;
-    const go = () => {
-      loadRows(boxes[n - 1].rows.map(Box.unpack));
-      restoredFrom = n;
-      savedSig = sig();
-      renderSave(okNow());
-      setTab('import');
-      g('list-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    };
-    if (!unsaved()) { go(); return; }
-    ask('3の一覧に、BOXに保存していない行があります。戻すと、その行は消えます。', [
-      { label: '先にBOXへ保存する', cls: 'primary', fn: () => { setTab('import'); g('box-save').scrollIntoView({ behavior: 'smooth', block: 'center' }); } },
-      { label: '消して戻す', fn: go },
-      { label: 'やめる' },
-    ]);
   }
 
   async function writeClipboard(text) {
@@ -833,7 +810,6 @@ const BoxUi = (() => {
     toggleMenu('sort-open', 'sort-menu');
     g('box-rename').addEventListener('click', () => { closeMenus(); rename(); });
     g('box-file').addEventListener('click', () => { closeMenus(); file(); });
-    g('box-restore').addEventListener('click', () => { closeMenus(); restore(); });
     g('box-clear').addEventListener('click', () => { closeMenus(); clear(); });
     g('box-copy').addEventListener('click', () => { closeMenus(); copy(); });
     // 編集画面(全画面)。入力・進化・種族の検索は、3の行と同じ処理
@@ -884,5 +860,5 @@ const BoxUi = (() => {
     renderSave(okNow());
   }
 
-  return { init, renderSave, renderAll, afterEdit, sheetHtml, setTab, _state: () => ({ boxes, active, restoredFrom, savedSig, sheet, selected, selectMode, picked }) };
+  return { init, renderSave, renderAll, afterEdit, sheetHtml, setTab, _state: () => ({ boxes, active, savedSig, sheet, selected, selectMode, picked }) };
 })();

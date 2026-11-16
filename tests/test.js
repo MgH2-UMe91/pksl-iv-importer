@@ -37,6 +37,12 @@ eq('性格の完全一致', Match.nature('いじっぱり'), { value: 'いじっ
 eq('性格の誤字', Match.nature('いじっぱリ').value, 'いじっぱり');
 eq('性格の1字余り', Match.nature('さみしがリや').value, 'さみしがり');
 eq('関係ない文字は性格にしない', Match.nature('ポケモン').value, '');
+eq('性格: OCRが文字を足した', [Match.nature('おくびぴびょう').value, Match.nature('おくびぴょう').value], ['おくびょう', 'おくびょう']);
+eq('性格: 足した文字が多すぎ・短い名前は拾わない', [Match.nature('ぴぴぴおくびょう').value, Match.nature('すあなおあ').value], ['', '']);
+eq('性格: 頭3文字(小書き文字をそろえても)は25種で重ならない', new Set(NATURES.map((n) => [...Match.fold(n)].slice(0, 3).join(''))).size, NATURES.length);
+eq('性格: 頭2文字でも重ならない', new Set(NATURES.map((n) => [...Match.fold(n)].slice(0, 2).join(''))).size, NATURES.length);
+eq('性格: 頭3文字だけで決まる(確かさは低)', [Match.nature('おくびxxxxx'), Match.nature('うつかり')], [{ value: 'おくびょう', confidence: 'low' }, { value: 'うっかりや', confidence: 'low' }]);
+eq('性格: 頭3文字の1字違い・2字だけは使わない', [Match.nature('おくぴxxxxx').value, Match.nature('おくxxx').value], ['', '']);
 eq('サブスキルの完全一致', Match.subskill('おてつだいスピードM').value, 'おてつだいスピードM');
 eq('全角の英字', Match.subskill('食材確率アップS').value, '食材確率アップS');
 eq('末尾の欠けはS/Mを決めない', Match.subskill('食材確率アップ').value, '');
@@ -167,8 +173,6 @@ eq('普通の名前はそのままファイル名にする', Box.fileName('本�
 eq('250匹入っているBOXに70匹は入らない', Box.plan(70, [250, 0]), [{ fits: false, room: 50 }, { fits: true, room: 300 }]);
 eq('ちょうど300匹になるなら入る', Box.plan(50, [250, 300]), [{ fits: true, room: 50 }, { fits: false, room: 0 }]);
 eq('両方に入らないこともある', Box.plan(100, [250, 280]).map((x) => x.fits), [false, false]);
-eq('上書きなら元の中身を数えない(300匹のBOXに300匹)', Box.plan(300, [300, 10], 1).map((x) => x.fits), [true, false]);
-eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1).map((x) => x.fits), [false, false]);
 {
   const r = row({ nickname: 'たろう', skillLevel: 6, shiny: true, mint: true, ribbon: 500, sub: ['おてつだいボーナス', 'きのみの数S', '', '', ''] });
   const back = Box.unpack(JSON.parse(JSON.stringify(Box.pack(r))));
@@ -440,33 +444,53 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('読んだ名前と食い違えば mismatch(読んだ名前を返す)', [Match.skillInfo('フシギダネ', 'げんきチャージS$S').state, Match.skillInfo('フシギダネ', 'げんきチャージS$S').read], ['mismatch', 'げんきチャージS']);
   eq('読めない・辞書にない名前は食い違いと見なさない', [Match.skillInfo('フシギダネ', '').state, Match.skillInfo('フシギダネ', '####').state], ['ok', 'ok']);
   eq('スキル名の読み違い(1字)は直る', Match.skillOf('おてつだいブ一スト') !== '', true);
+  eq('カッコ付きの名前は、カッコの前で照合する(末尾のゴミがあっても)', [Match.skillOf('はどうだん(ゆめのかけらゲットS5S)'), Match.skillOf('はどうだん(ゆめのかけらゲットS)')], ['はどうだん(ゆめのかけらげつとS)', 'はどうだん(ゆめのかけらげつとS)']);
+  eq('カッコの前が短すぎたり、複数に当たったりするときは使わない', [Match.skillOf('き(ゴミ)'), Match.skillOf('(ゴミ)')], ['', '']);
 }
 
 // ニックネームの個体の種族推定(メインスキル+食材の個数・同じ絵+食材の絵の特徴)
 {
   const clueOf = (name, comboIdx = 0) => {
     const c = Match.combos(name)[comboIdx], a = c.ing[0];
-    return { amount: [c.amt[1], c.amt[2]], s21: c.ing[1] === a ? 1 : 0, s31: c.ing[2] === a ? 1 : 0, s32: c.ing[1] === c.ing[2] ? 1 : 0, feat: [ING_FEAT[c.ing[1]], ING_FEAT[c.ing[2]]] };
+    return { amount: [c.amt[1], c.amt[2]], s21: c.ing[1] === a ? 1 : 0, s31: c.ing[2] === a ? 1 : 0, s32: c.ing[1] === c.ing[2] ? 1 : 0, color: [colorOf(c.ing[1]), colorOf(c.ing[2])] };
   };
-  eq('食材の見本は20種(どの種族の食材も揃っている)', [Object.keys(ING_FEAT).length, POKEMON.every((p) => (p.myth ?? p.ing).every((g) => ING_FEAT[g]?.length === 6))], [20, true]);
-  const monmen = Match.guessSpecies(MAIN_SKILLS['モンメン'], { amount: [5, 7], s21: 1, s31: 1, s32: 1, feat: [ING_FEAT['ひとくちナッツ'], ING_FEAT['ひとくちナッツ']] });
+  // 食材の表どおりの色(読み取った結果のかわり)
+  const colorOf = (g) => { const [u, d, up, dp] = INGREDIENT_COLORS[g]; return { up: { name: u, pct: up }, down: { name: d, pct: dp } }; };
+  const nutObs = { up: { name: 'オレンジ', pct: 40 }, down: { name: '茶', pct: 32 } };
+  eq('食材の色: 別の表(5つ目)があれば近いほうで比べる', [Match.colorDist(nutObs, INGREDIENT_COLORS['ひとくちナッツ']), Match.colorDist(nutObs, INGREDIENT_COLORS['マメミート'])], [0, 101]);
+  eq('食材の色の表は20種(どの種族の食材も揃っている)', [Object.keys(INGREDIENT_COLORS).length, POKEMON.every((p) => (p.myth ?? p.ing).every((g) => INGREDIENT_COLORS[g]?.length >= 4))], [20, true]);
+  const monmen = Match.guessSpecies(MAIN_SKILLS['モンメン'], { amount: [5, 7], s21: 1, s31: 1, s32: 1, color: [colorOf('ひとくちナッツ'), colorOf('ひとくちナッツ')] });
   eq('モンメン(新種族): 進化の系統・スキル・色アイコン・推定', [Match.finals('モンメン'), MAIN_SKILLS['エルフーン'], !!POKE_ICONS['モンメン'], monmen.options], [['エルフーン'], 'げんきチャージS', true, ['エルフーン']]);
   eq('系統が1つなら最終進化を自動で選ぶ(ミミッキュ)', Match.guessSpecies(MAIN_SKILLS['ミミッキュ'], clueOf('ミミッキュ')), { kind: 'single', species: 'ミミッキュ', options: ['ミミッキュ'] });
-  eq('進化前のスキル・食材でも最終進化(ムウマ → ムウマージ)', Match.guessSpecies(MAIN_SKILLS['ムウマ'], { ...clueOf('ムウマ'), feat: null }).species ?? Match.guessSpecies(MAIN_SKILLS['ムウマ'], clueOf('ムウマ')).options[0], 'ムウマージ');
+  eq('進化前のスキル・食材でも最終進化(ムウマ → ムウマージ)', Match.guessSpecies(MAIN_SKILLS['ムウマ'], { ...clueOf('ムウマ'), color: null }).species ?? Match.guessSpecies(MAIN_SKILLS['ムウマ'], clueOf('ムウマ')).options[0], 'ムウマージ');
   const g = Match.guessSpecies(MAIN_SKILLS['フシギダネ'], clueOf('フシギダネ'));
   eq('食材の絵がはっきり合わない系統は外す(フシギダネ: リザードンは外れる)', [g.kind, g.ranked, g.options[0], g.options.includes('リザードン')], ['choose', true, 'フシギバナ', false]);
-  const far = clueOf('フシギダネ').feat.map((f) => f.map((v) => v + 200));
-  eq('絵の読み取りが大きく外れているときは外さない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), feat: far }).options.includes('リザードン'), true);
-  const yadon = Match.guessSpecies(MAIN_SKILLS['ヤドン'], { amount: [1, 2], s21: null, s31: null, s32: null, feat: [ING_FEAT['おいしいシッポ'], ING_FEAT['おいしいシッポ']] });
+  const wrong = { up: { name: '青', pct: 90 }, down: { name: '紫', pct: 90 } };
+  eq('絵の読み取りが大きく外れているときは外さない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), color: [wrong, wrong] }).options.includes('リザードン'), true);
+  const yadon = Match.guessSpecies(MAIN_SKILLS['ヤドン'], { amount: [1, 2], s21: null, s31: null, s32: null, color: [colorOf('おいしいシッポ'), colorOf('おいしいシッポ')] });
   eq('ヤドンのしっぽなら、イーブイ系は候補から外れる', [yadon.options.includes('ヤドキング'), yadon.options.includes('ブースター')], [true, false]);
-  eq('絵の特徴がなければ並べ替えない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), feat: null }).ranked, false);
+  eq('絵の特徴がなければ並べ替えない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), color: null }).ranked, false);
   eq('分岐進化は最終進化の候補を出す(イーブイ)', (() => { const r = Match.guessSpecies(MAIN_SKILLS['イーブイ'], { ...clueOf('イーブイ'), amount: [null, null], s21: null, s31: null, s32: null }); return r.kind; })(), 'choose');
-  eq('どれにも合わなければ none', Match.guessSpecies('ありえないスキル名です', { amount: [99, 99], s21: null, s31: null, s32: null }).kind, 'none');
+  eq('どの種族の表にもない個数は、読めなかった扱い(ヤドン: x1 を 14 と読んでも候補が残る)', Match.guessSpecies(MAIN_SKILLS['ヤドン'], { amount: [14, 2], s21: null, s31: null, s32: null }).kind !== 'none', true);
+  // 姿の色: アイコンの塗りの色そのものを姿の画素とみなす
+  const spriteOf = (name) => POKE_ICONS[name][0].flatMap((h) => Array.from({ length: 30 }, () => Match.lab([1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)))).flat());
+  eq('姿の色: その種族のアイコンの色が一番合う', Match.spriteScore(spriteOf('ヒトカゲ'), 'ヒトカゲ') < Match.spriteScore(spriteOf('ヒトカゲ'), 'フシギダネ'), true);
+  const noColor = { amount: [null, null], s21: null, s31: null, s32: null };
+  const lizard = Match.guessSpecies(MAIN_SKILLS['ヒトカゲ'], { ...noColor, sprite: spriteOf('ヒトカゲ') });
+  eq('姿の色で、系統の並びの先頭が入れ替わる(食材の絵がないとき)', [lizard.kind, lizard.options[0], lizard.colored], ['choose', 'リザードン', true]);
+  eq('色違いの個体には姿の色を使わない', Match.guessSpecies(MAIN_SKILLS['ヒトカゲ'], { ...noColor, sprite: spriteOf('ヒトカゲ') }, { shiny: true }).colored, false);
+  const shinyOf = (name) => POKE_ICONS[name][1].flatMap((h) => Array.from({ length: 30 }, () => Match.lab([1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)))).flat());
+  eq('色違いの色に近いときは、色違いとみなして姿の色を使わない', (() => { const r = Match.guessSpecies(MAIN_SKILLS['ヒトカゲ'], { ...noColor, sprite: shinyOf('ヒトカゲ') }); return [r.shinyGuess, r.colored]; })(), [true, false]);
+  eq('姿の色が分からなければ使わない', Match.guessSpecies(MAIN_SKILLS['ヒトカゲ'], { ...noColor, sprite: [] }).colored, false);
+  eq('どれにも合わなければ none', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { amount: [null, null], s21: 1, s31: 0, s32: 1 }).kind, 'none');
+  eq('スキル名が読めないときは、スキルでは絞らない', Match.candidates('ありえないスキル名です', { amount: [5, 7], s21: 1, s31: 1, s32: 1 }).includes('モンメン'), true);
   eq('きのみの絵の色: 見本そのものなら、そのタイプ', Match.berryType(BERRY_FEAT.poison), 'poison');
   eq('きのみの絵の色: 見本から遠い・2つの間で迷うなら使わない', [Match.berryType([0, 0, 0]), Match.berryType(null), Match.berryType(BERRY_FEAT.poison.map((v, i) => (v + BERRY_FEAT.fairy[i]) / 2))], ['', '', '']);
   eq('きのみがどくなら、ほかのタイプの種族を候補から外す(ウパー(パルデア)とウパー)', (() => { const c = { ...clueOf('ウパー(パルデア)'), berry: BERRY_FEAT.poison }; const n = Match.candidates(MAIN_SKILLS['ウパー(パルデア)'], c); return [n.includes('ウパー(パルデア)'), n.includes('ウパー'), n.every((x) => Match.find(x).type === 'poison')]; })(), [true, false, true]);
   eq('絞って1つも残らないときは、きのみを使わない', (() => { const c = { ...clueOf('フシギダネ'), berry: BERRY_FEAT.fairy }; return Match.candidates(MAIN_SKILLS['フシギダネ'], c).includes('フシギダネ'); })(), true);
-  eq('食材の絵の合い具合は、同じ食材の並びなら 0', Match.ingredientFit('フシギダネ', clueOf('フシギダネ').feat), 0);
+  eq('食材の絵の合い具合は、同じ食材の並びなら 0', Match.ingredientFit('フシギダネ', clueOf('フシギダネ').color), 0);
+  eq('食材の絵: 色の名前が違えば大きく、割合の差は小さく数える', [Match.colorDist(colorOf('ほっこりポテト'), INGREDIENT_COLORS['ほっこりポテト']), Match.colorDist({ up: { name: 'うす茶', pct: 60 }, down: { name: 'オレンジ', pct: 40 } }, INGREDIENT_COLORS['ほっこりポテト']), Match.colorDist(colorOf('ほっこりポテト'), INGREDIENT_COLORS['あじわいキノコ'])], [0, 20, 200]);
+  eq('食材の絵: 名札に隠れて取れない側は数えない', Match.colorDist({ up: { name: 'なし', pct: 0 }, down: { name: 'オレンジ', pct: 48 } }, INGREDIENT_COLORS['ほっこりポテト']), 0);
   eq('特徴がなければ null', Match.ingredientFit('フシギダネ', null), null);
 }
 

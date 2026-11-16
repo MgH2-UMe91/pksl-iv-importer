@@ -259,6 +259,93 @@ const Reader = (() => {
     return v.map((t) => Math.round((t / n) * 100));
   }
 
+  // ---------- 食材の絵の「上と下の主な色」 ----------
+  // 円の中心で上下に分け、背景(円の地のクリーム色)を除いた画素を色の名前で数える。名前と割合を返す。
+  // 解放前(鍵の付いた枠)の絵は「白に50%で重ねた色」になっているので、元の色に戻してから数える。
+  // 境目は、手元のスクショの画素を見て決めた(measure/report-color.md)
+  const CREAM = [[255, 250, 224], [252, 255, 240]]; // 円の地の色(中心寄りと縁寄り)
+  function nearCream([r, g, b]) {
+    const [a, c] = CREAM, v = c.map((t, i) => t - a[i]), w = [r - a[0], g - a[1], b - a[2]];
+    const t = Math.max(0, Math.min(1, (w[0] * v[0] + w[1] * v[1] + w[2] * v[2]) / (v[0] ** 2 + v[1] ** 2 + v[2] ** 2)));
+    return Math.hypot(...w.map((x, i) => x - t * v[i]));
+  }
+  function hsv([r, g, b]) {
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0;
+    if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [(h * 60 + 360) % 360, mx ? d / mx : 0, mx / 255];
+  }
+  function colorName(p) {
+    const [h, s, v] = hsv(p);
+    if (v < 0.32) return '黒っぽい';
+    if (s < 0.16) return v > 0.78 ? '白' : '灰';
+    if (s < 0.30 && v > 0.80 && h >= 12 && h < 60) return '白'; // ごく薄いベージュ(卵の殻、ミルクの影、つや)は白
+    if (h < 12 || h >= 340) return s < 0.45 && v > 0.8 ? 'ピンク' : '赤';
+    if (h >= 300) return 'ピンク';
+    if (h < 42) return v < 0.82 ? '茶' : s > 0.62 ? 'オレンジ' : 'うす茶'; // うす茶 = ポテトのような明るいベージュ茶
+    if (h < 68) return '黄';
+    if (h < 170) return '緑';
+    if (h < 260) return '青';
+    return '紫';
+  }
+  // cx, cy: 円の中心(画素)。half: 切り出す正方形の半分の幅(画素。詳細画面では 0.075W)。
+  // locked: 鍵の付いた枠か。cardB: 名札の下端(画素)。1枠目で名札に隠れる部分を除くときだけ渡す
+  function iconColors(P, cx, cy, half, { locked = false, cardB = null } = {}) {
+    const S = 64, C = 31.5, R = 23.5;
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(P.c, cx - half, cy - half, 2 * half, 2 * half, 0, 0, S, S);
+    const d = ctx.getImageData(0, 0, S, S).data;
+    const cardY = cardB === null ? -1 : (cardB - (cy - half)) / (2 * half) * S + 2;
+    const cnt = [{}, {}], sums = [0, 0];
+    for (let y = 0; y < S; y++) {
+      if (y < cardY) continue;
+      for (let x = 0; x < S; x++) {
+        const dx = x - C, dy = y - C;
+        if (dx * dx + dy * dy > R * R * 0.78 || (dx > 0.3 * R && dy > 0.4 * R) || y < 9) continue; // y<9 は鍵の札、右下は個数の札
+        const k = (y * S + x) * 4;
+        let p = [d[k], d[k + 1], d[k + 2]];
+        if (locked) p = p.map((t) => Math.max(0, Math.min(255, (t - 127.5) / 0.5)));
+        if (nearCream(p) < 12) continue; // 背景に近い画素は数えない
+        const part = dy < 0 ? 0 : 1, n = colorName(p);
+        cnt[part][n] = (cnt[part][n] ?? 0) + 1; sums[part]++;
+      }
+    }
+    const top = (i) => {
+      const r = Object.entries(cnt[i]).sort((a, b) => b[1] - a[1])[0];
+      return r ? { name: r[0], pct: Math.round((r[1] / sums[i]) * 100) } : { name: 'なし', pct: 0 };
+    };
+    return { up: top(0), down: top(1) };
+  }
+
+  // 名札のポケモンの姿の画素を、Lab の色(明るさ・赤み・黄み)の並びにして返す(3つずつ並べた配列)。
+  // 名札の白と円の地の色、下の20%(地面の影)は除く。2画素おきに数える
+  function spriteLab(P, card) {
+    const S = 96, W = P.W, h = card.b - card.a;
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(P.c, W * 0.055, card.a + h * 0.08, W * 0.14, W * 0.14, 0, 0, S, S);
+    const d = ctx.getImageData(0, 0, S, S).data;
+    const at = (x, y) => { const k = (y * S + x) * 4; return [d[k], d[k + 1], d[k + 2]]; };
+    const tally = {};
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const r = Math.hypot(x - 47.5, y - 47.5);
+      if (r > 40 && r < 46) { const key = at(x, y).map((v) => v >> 3).join(); tally[key] = (tally[key] ?? 0) + 1; }
+    }
+    const top = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
+    const circle = top ? top[0].split(',').map((v) => v * 8 + 4) : [255, 250, 224];
+    const q = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const out = [];
+    for (let y = 0; y < S * 0.8; y += 2) for (let x = 0; x < S; x += 2) {
+      const p = at(x, y);
+      if (q(p, [255, 255, 255]) < 22 || q(p, circle) < 22) continue;
+      out.push(...Match.lab(p));
+    }
+    return out;
+  }
+
   // きのみの絵の色の特徴(平均色の3つの数)。詳細画面では絵の下半分が名札に隠れるので、見えている上の部分だけを使う。
   // cx, cy は円の中心、R は円の半径(画素)。取れないときは null
   function berryFeatureAt(P, cx, cy, R) {
@@ -349,8 +436,11 @@ const Reader = (() => {
       s21: visible ? similarity(P, icon[0], icon[1], stripTop, stripBottom) : null,
       s31: visible ? similarity(P, icon[0], icon[2], stripTop, stripBottom) : null,
       s32: similarity(P, icon[1], icon[2], iy - W * 0.04, stripBottom),
-      // 2枠目・3枠目の食材の色の特徴(1枠目は名札にかかることがあり、種族で決まるので使わない)
-      feat: [icon[1], icon[2]].map((cx) => iconFeature(P, cx, iy + W * 0.005, W * 0.055)),
+      // 2枠目・3枠目の食材の絵の、上下の主な色(1枠目は名札にかかることがあり、種族で決まるので使わない)。
+      // 鍵の付いた枠(2枠目はLv30未満、3枠目はLv60未満)は、薄く表示されているので戻して数える。レベルが読めなければ鍵なしとみなす
+      color: [1, 2].map((i) => iconColors(P, icon[i], iy + W * 0.005, W * 0.075, { locked: res.level !== null && res.level < (i === 1 ? 30 : 60) })),
+      // ポケモンの姿の色(種族の候補を並べ替えるのに使う)
+      sprite: spriteLab(P, card),
       // きのみの絵の色(確かなときだけ、タイプで絞るのに使う)
       berry: berryFeature(P, iy),
     };
@@ -377,5 +467,5 @@ const Reader = (() => {
     } finally { URL.revokeObjectURL(url); }
   }
 
-  return { read, readSkillNameOnly, iconFeature, berryFeatureAt, berryFeature, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
+  return { read, readSkillNameOnly, iconFeature, iconColors, spriteLab, berryFeatureAt, berryFeature, analyze, locate, getPixels, startWorker, levelDigitSpan, isPrepared: () => prepared };
 })();

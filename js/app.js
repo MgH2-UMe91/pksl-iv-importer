@@ -52,7 +52,7 @@ function applyReading(row, read) {
 // 系統が1つなら最終進化形を入れる(印を付けて確認を促す)。ほかの系統も残るときは、候補を食材の絵が合う順に出して選んでもらう
 function guessSpecies(row, read) {
   if (row.species || row.candidates.length) return;
-  const g = Match.guessSpecies(read.skillName, read.clues);
+  const g = Match.guessSpecies(read.skillName, read.clues, { shiny: row.shiny });
   if (g.kind === 'single') {
     row.species = g.species;
     row.low.add('species');
@@ -198,30 +198,6 @@ function addRow(row) {
   el.innerHTML = rowHtml(row);
   $('rows').append(el);
   refresh();
-}
-
-// 3の一覧を、BOX から出した個体に置き換える。一括の指定は「読取」などの初期状態に戻す(値は各行に入っている)
-function loadRows(list) {
-  for (const r of state.rows) if (r.image) URL.revokeObjectURL(r.image);
-  state.rows = [];
-  $('rows').innerHTML = '';
-  state.bulkLevel = null; state.bulkSkill = null; state.bulkSeed = false; state.bulkRibbon = null;
-  for (const b of $('levels').children) b.classList.toggle('selected', b.dataset.level === 'null');
-  for (const b of $('skill-levels').children) b.classList.toggle('selected', b.dataset.level === 'null');
-  const frag = document.createDocumentFragment();
-  for (const p of list) {
-    const row = Object.assign(newRow(), p, { manualLevel: Number.isFinite(p.level) ? p.level : null, readSkill: p.skillLevel });
-    row.low = new Set(Box.lowKeys(row));
-    state.rows.push(row);
-    const el = document.createElement('div');
-    el.className = 'row';
-    el.dataset.id = row.id;
-    el.innerHTML = rowHtml(row);
-    frag.append(el);
-  }
-  $('rows').append(frag);
-  $('progress').textContent = '';
-  refresh(); // 300匹でも1回だけ
 }
 
 function renderRow(row) {
