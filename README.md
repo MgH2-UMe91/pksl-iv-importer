@@ -32,6 +32,7 @@
 | 対象 | 出どころ | ライセンス |
 | --- | --- | --- |
 | `data/pokemon.js` の種族・食材・タイプ(タイプはポケモンのきのみのタイプ) | [nerolis-lab](https://github.com/nerolis-lab/nerolis-lab) | Apache-2.0 |
+| `data/pokemon.js` のモンメン・エルフーン(取り込み元に無かったので手で足した。ファイルの先頭に記録) | [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool) の src/data/pokemon.json(コミット 810edfaa) | MIT(全文と著作権表示は `THIRD-PARTY-LICENSES.txt`) |
 | `data/pokemon.js` の日本語の種族名 | [PokeAPI](https://github.com/PokeAPI/pokeapi) | BSD-3-Clause |
 | `data/pokeicons.js`(BOX の色の四角アイコン。`tools/build_pokeicons.js` で作る) | [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool) の PokemonIconData.ts | MIT(全文と著作権表示は `THIRD-PARTY-LICENSES.txt`) |
 | `data/skills.js`(種族ごとのメインスキル名。`tools/build_skills.js` で作る。取得元のコミットはファイルの先頭に記録) | [nitoyon/pokesleep-tool](https://github.com/nitoyon/pokesleep-tool) の src/data/pokemon.json と src/i18n/ja/skills.json | MIT(全文と著作権表示は `THIRD-PARTY-LICENSES.txt`) |

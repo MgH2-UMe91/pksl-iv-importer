@@ -448,7 +448,9 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
     const c = Match.combos(name)[comboIdx], a = c.ing[0];
     return { amount: [c.amt[1], c.amt[2]], s21: c.ing[1] === a ? 1 : 0, s31: c.ing[2] === a ? 1 : 0, s32: c.ing[1] === c.ing[2] ? 1 : 0, feat: [ING_FEAT[c.ing[1]], ING_FEAT[c.ing[2]]] };
   };
-  eq('食材の見本は19種(どの種族の食材も揃っている)', [Object.keys(ING_FEAT).length, POKEMON.every((p) => (p.myth ?? p.ing).every((g) => ING_FEAT[g]?.length === 6))], [19, true]);
+  eq('食材の見本は20種(どの種族の食材も揃っている)', [Object.keys(ING_FEAT).length, POKEMON.every((p) => (p.myth ?? p.ing).every((g) => ING_FEAT[g]?.length === 6))], [20, true]);
+  const monmen = Match.guessSpecies(MAIN_SKILLS['モンメン'], { amount: [5, 7], s21: 1, s31: 1, s32: 1, feat: [ING_FEAT['ひとくちナッツ'], ING_FEAT['ひとくちナッツ']] });
+  eq('モンメン(新種族): 進化の系統・スキル・色アイコン・推定', [Match.finals('モンメン'), MAIN_SKILLS['エルフーン'], !!POKE_ICONS['モンメン'], monmen.options], [['エルフーン'], 'げんきチャージS', true, ['エルフーン']]);
   eq('系統が1つなら最終進化を自動で選ぶ(ミミッキュ)', Match.guessSpecies(MAIN_SKILLS['ミミッキュ'], clueOf('ミミッキュ')), { kind: 'single', species: 'ミミッキュ', options: ['ミミッキュ'] });
   eq('進化前のスキル・食材でも最終進化(ムウマ → ムウマージ)', Match.guessSpecies(MAIN_SKILLS['ムウマ'], { ...clueOf('ムウマ'), feat: null }).species ?? Match.guessSpecies(MAIN_SKILLS['ムウマ'], clueOf('ムウマ')).options[0], 'ムウマージ');
   const g = Match.guessSpecies(MAIN_SKILLS['フシギダネ'], clueOf('フシギダネ'));
