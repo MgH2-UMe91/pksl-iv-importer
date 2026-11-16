@@ -452,7 +452,11 @@ eq('上書きでも300匹を超えたら入らない', Box.plan(301, [10, 10], 1
   eq('系統が1つなら最終進化を自動で選ぶ(ミミッキュ)', Match.guessSpecies(MAIN_SKILLS['ミミッキュ'], clueOf('ミミッキュ')), { kind: 'single', species: 'ミミッキュ', options: ['ミミッキュ'] });
   eq('進化前のスキル・食材でも最終進化(ムウマ → ムウマージ)', Match.guessSpecies(MAIN_SKILLS['ムウマ'], { ...clueOf('ムウマ'), feat: null }).species ?? Match.guessSpecies(MAIN_SKILLS['ムウマ'], clueOf('ムウマ')).options[0], 'ムウマージ');
   const g = Match.guessSpecies(MAIN_SKILLS['フシギダネ'], clueOf('フシギダネ'));
-  eq('ほかの系統も残れば選んでもらう(食材の絵が合う順で、本物が先頭)', [g.kind, g.ranked, g.options[0], g.options.includes('リザードン')], ['choose', true, 'フシギバナ', true]);
+  eq('食材の絵がはっきり合わない系統は外す(フシギダネ: リザードンは外れる)', [g.kind, g.ranked, g.options[0], g.options.includes('リザードン')], ['choose', true, 'フシギバナ', false]);
+  const far = clueOf('フシギダネ').feat.map((f) => f.map((v) => v + 200));
+  eq('絵の読み取りが大きく外れているときは外さない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), feat: far }).options.includes('リザードン'), true);
+  const yadon = Match.guessSpecies(MAIN_SKILLS['ヤドン'], { amount: [1, 2], s21: null, s31: null, s32: null, feat: [ING_FEAT['おいしいシッポ'], ING_FEAT['おいしいシッポ']] });
+  eq('ヤドンのしっぽなら、イーブイ系は候補から外れる', [yadon.options.includes('ヤドキング'), yadon.options.includes('ブースター')], [true, false]);
   eq('絵の特徴がなければ並べ替えない', Match.guessSpecies(MAIN_SKILLS['フシギダネ'], { ...clueOf('フシギダネ'), feat: null }).ranked, false);
   eq('分岐進化は最終進化の候補を出す(イーブイ)', (() => { const r = Match.guessSpecies(MAIN_SKILLS['イーブイ'], { ...clueOf('イーブイ'), amount: [null, null], s21: null, s31: null, s32: null }); return r.kind; })(), 'choose');
   eq('どれにも合わなければ none', Match.guessSpecies('ありえないスキル名です', { amount: [99, 99], s21: null, s31: null, s32: null }).kind, 'none');

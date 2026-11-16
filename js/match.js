@@ -277,7 +277,7 @@ const Match = (() => {
   //   { kind: 'choose', options, ranked } 選んでもらう。系統が1つで最終進化が複数(イーブイなど)か、複数の系統が残った場合。
   //     複数の系統は、食材の絵が合う順に並べる(ranked が true なら絵で並べた)
   //   { kind: 'none', options: [] } 決められない
-  const MAX_OPTIONS = 12;
+  const MAX_OPTIONS = 12, FIT_MARGIN = 15, FIT_TRUST = 60;
   function guessSpecies(skillName, clues) {
     const names = candidates(skillName, clues);
     if (!names.length) return { kind: 'none', options: [] };
@@ -293,7 +293,13 @@ const Match = (() => {
       fit.set(r, scores.length ? Math.min(...scores) : null);
     }
     const ranked = roots.every((r) => fit.get(r) !== null);
-    const order = ranked ? roots.slice().sort((x, y) => fit.get(x) - fit.get(y)) : roots;
+    let order = ranked ? roots.slice().sort((x, y) => fit.get(x) - fit.get(y)) : roots;
+    // 絵がはっきり合わない系統は外す。手元の標本で、正解の系統の差は最大でも10。余裕を見て15離れたら外す。
+    // 1位の点が大きすぎるときは絵の読み取り自体が外れているので、外さない
+    if (ranked && fit.get(order[0]) <= FIT_TRUST) {
+      const kept = order.filter((r) => fit.get(r) <= fit.get(order[0]) + FIT_MARGIN);
+      order = kept; // 1つに絞れても自動では入れない(絵の判定だけで決めるのは危ないので、選んでもらう)
+    }
     return { kind: 'choose', options: order.flatMap((r) => finals(r)).slice(0, MAX_OPTIONS), ranked };
   }
 
