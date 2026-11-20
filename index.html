@@ -44,12 +44,6 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   </div>
   <div class="sel-row">
     <span id="box-count" class="note" role="status"></span>
-    <span id="sel-tools" class="sel-tools" hidden>
-      <span id="sel-count" role="status"></span>
-      <button id="sel-all" type="button">全部選ぶ</button>
-      <button id="sel-none" type="button">選択を外す</button>
-      <button id="sel-end" type="button">終わる</button>
-    </span>
   </div>
 </div>
 </div>
@@ -149,12 +143,21 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 </div>
 
 <div id="box-bar" class="box-bar" hidden>
+  <div class="bar-part bar-norm">
   <button id="filter-open" type="button" class="filter-btn" aria-haspopup="dialog" aria-label="絞り込み・並べ替え">🔍 OFF</button>
   <button id="sort-open" type="button" class="sort-btn" aria-haspopup="menu" aria-expanded="false" aria-label="並べ替え">レベル</button>
   <button id="sort-dir" type="button" class="sort-dir" aria-label="並べ替えの向きを逆にする">↓</button>
   <span class="bar-grow"></span>
   <button id="csv-open" type="button" aria-haspopup="menu" aria-expanded="false">CSV ▾</button>
   <button id="sel-toggle" type="button" class="sel-toggle" aria-pressed="false">☑ 選択</button>
+  </div>
+  <div class="bar-part bar-sel">
+  <button id="sel-end" type="button" class="x" aria-label="選択を終わる">✕</button>
+  <span id="sel-count" class="cnt" role="status"></span>
+  <span class="bar-grow"></span>
+  <button id="sel-all" type="button">全部</button>
+  <button id="sel-ops" type="button" class="ops" aria-haspopup="dialog" aria-expanded="false">操作 ▴</button>
+  </div>
 </div>
 <div id="sort-menu" class="pop-menu more-menu bar-sort" role="menu" hidden></div>
 <div id="csv-menu" class="pop-menu more-menu bar-more bar-csv" role="menu" hidden>
@@ -194,11 +197,19 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 
 <div id="sel-bar" class="sel-bar" hidden>
   <p id="sel-msg" class="box-warn" role="status"></p>
-  <div class="sel-bar-btns">
-    <button id="sel-copy" type="button">CSVをコピー</button>
-    <button id="sel-move" type="button">BOX移動</button>
-    <button id="sel-edit" type="button">一括編集</button>
-    <button id="sel-del" type="button" class="danger-text">削除</button>
+</div>
+<div id="sel-sheet" hidden>
+  <div id="sel-backdrop" class="sheet-backdrop"></div>
+  <div class="bsheet" role="dialog" aria-labelledby="sel-sheet-title">
+    <div class="handle"></div>
+    <div class="sh-head"><b id="sel-sheet-title"></b></div>
+    <div class="sh-list">
+      <button id="sel-copy" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/></svg>CSVをコピー</button>
+      <button id="sel-move" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg><span id="sel-move-label">BOX2へ移動</span><small id="sel-move-room"></small></button>
+      <button id="sel-edit" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>一括編集<small>レベル・ミントなど</small></button>
+      <button id="sel-del" type="button" class="danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>削除</button>
+    </div>
+    <button id="sel-sheet-close" type="button" class="sh-close">閉じる</button>
   </div>
 </div>
 

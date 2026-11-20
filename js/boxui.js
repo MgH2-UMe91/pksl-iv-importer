@@ -33,6 +33,7 @@ const BoxUi = (() => {
     g('pane-box').hidden = !box;
     g('box-top').hidden = !(box && enabled()); // 上部の固定部分(BOX の切り替え・複数選択)は BOX タブのときだけ
     g('box-bar').hidden = !(box && enabled()); // 下の固定バーも同じ
+    document.documentElement.classList.toggle('boxtab', box && enabled()); // BOX の画面だけ、上部の固定部分と一覧の間の余白を詰める
     if (remember) Box.saveTab(name);
     if (!box) endSelect();
     if (box) renderAll();
@@ -478,19 +479,38 @@ const BoxUi = (() => {
     g('sel-toggle').setAttribute('aria-pressed', String(selectMode));
     g('sel-toggle').classList.toggle('on', selectMode);
     g('sel-toggle').disabled = !selectMode && boxes[active - 1].rows.length === 0;
-    g('box-count').hidden = selectMode;
-    g('sel-tools').hidden = !selectMode;
+    document.documentElement.classList.toggle('selmode', selectMode);
     g('sel-count').textContent = `${n}匹選択中`;
+    const all = Box.view(boxes[active - 1].rows, viewOpts()).order;
+    const allPicked = n > 0 && n >= all.length;
+    g('sel-all').textContent = allPicked ? '外す' : '全部';
+    g('sel-ops').disabled = n === 0;
+    if (n === 0) closeSheet();
     const hasMsg = !!g('sel-msg').textContent;
-    g('sel-bar').hidden = !(selectMode && (n > 0 || hasMsg));
-    for (const id of ['sel-copy', 'sel-move', 'sel-edit', 'sel-del']) g(id).disabled = n === 0;
-    document.documentElement.classList.toggle('selecting', selectMode && (n > 0 || hasMsg));
+    g('sel-bar').hidden = !(selectMode && hasMsg);
+    document.documentElement.classList.toggle('selecting', selectMode && hasMsg);
     for (const c of g('box-grid').querySelectorAll('.cell')) {
       const on = selectMode && picked.has(Number(c.dataset.i));
       c.classList.toggle('chk', on);
       c.setAttribute('aria-pressed', selectMode ? String(on) : 'false');
     }
   }
+
+  // 「操作」で下から出るシート
+  function openSheet() {
+    if (!picked.size) return;
+    const to = 3 - active;
+    g('sel-sheet-title').textContent = `${picked.size}匹を…`;
+    g('sel-move-label').textContent = `${nameOf(to)}へ移動`;
+    g('sel-move-room').textContent = `${nameOf(to)} ${boxes[to - 1].rows.length}/${Box.MAX}`;
+    g('sel-sheet').hidden = false;
+    g('sel-ops').setAttribute('aria-expanded', 'true');
+  }
+  function closeSheet() {
+    g('sel-sheet').hidden = true;
+    g('sel-ops').setAttribute('aria-expanded', 'false');
+  }
+  const afterSheet = (fn) => () => { closeSheet(); fn(); };
 
   function startSelect() {
     closeMenus();
@@ -501,6 +521,7 @@ const BoxUi = (() => {
   }
 
   function endSelect() {
+    closeSheet();
     selectMode = false;
     picked = new Set();
     g('sel-msg').textContent = '';
@@ -791,12 +812,19 @@ const BoxUi = (() => {
     // 複数選択
     g('sel-toggle').addEventListener('click', () => { if (selectMode) endSelect(); else startSelect(); });
     g('sel-end').addEventListener('click', endSelect);
-    g('sel-all').addEventListener('click', () => { picked = Box.selectAll(Box.view(boxes[active - 1].rows, viewOpts()).order); g('sel-msg').textContent = ''; updateSelUi(); });
-    g('sel-none').addEventListener('click', () => { picked = new Set(); g('sel-msg').textContent = ''; updateSelUi(); });
-    g('sel-copy').addEventListener('click', selCopy);
-    g('sel-move').addEventListener('click', selMove);
-    g('sel-edit').addEventListener('click', openBulk);
-    g('sel-del').addEventListener('click', selDelete);
+    g('sel-all').addEventListener('click', () => {
+      const order = Box.view(boxes[active - 1].rows, viewOpts()).order;
+      picked = picked.size > 0 && picked.size >= order.length ? new Set() : Box.selectAll(order); // 全部選ばれているときは、外す
+      g('sel-msg').textContent = '';
+      updateSelUi();
+    });
+    g('sel-ops').addEventListener('click', openSheet);
+    g('sel-sheet-close').addEventListener('click', closeSheet);
+    g('sel-backdrop').addEventListener('click', closeSheet);
+    g('sel-copy').addEventListener('click', afterSheet(selCopy));
+    g('sel-move').addEventListener('click', afterSheet(selMove));
+    g('sel-edit').addEventListener('click', afterSheet(openBulk));
+    g('sel-del').addEventListener('click', afterSheet(selDelete));
     g('bulk-apply').addEventListener('click', applyBulk);
     g('bulk-close').addEventListener('click', closeBulk);
     g('bulk-dialog').addEventListener('click', (ev) => { if (ev.target === g('bulk-dialog')) closeBulk(); });
