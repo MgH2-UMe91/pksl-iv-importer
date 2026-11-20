@@ -33,6 +33,7 @@ const BoxUi = (() => {
     g('pane-box').hidden = !box;
     g('box-top').hidden = !(box && enabled()); // 上部の固定部分(BOX の切り替え・複数選択)は BOX タブのときだけ
     g('box-bar').hidden = !(box && enabled()); // 下の固定バーも同じ
+    document.documentElement.classList.toggle('boxtab', box && enabled()); // BOX の画面だけ、上部の固定部分と一覧の間の余白を詰める
     if (remember) Box.saveTab(name);
     if (!box) endSelect();
     if (box) renderAll();

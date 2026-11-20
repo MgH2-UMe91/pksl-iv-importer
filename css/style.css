@@ -621,3 +621,9 @@ html.selmode .sel-row { display: none; }
 .bsheet .sh-list .danger { margin-top: 10px; color: var(--error); border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; }
 .bsheet .sh-list .danger svg { color: var(--error); }
 .bsheet .sh-close { width: 100%; margin-top: 6px; border-radius: 22px; min-height: 44px; }
+/* BOX の画面: 上部の固定部分と一覧(注意の枠)の間の余白を詰める */
+html.boxtab main { padding-top: 4px; }
+html.boxtab #box-app { padding-top: 0; }
+html.boxtab .box-top { padding-bottom: 2px; }
+html.boxtab .sel-row { min-height: 26px; }
+html.boxtab .box-flag { margin-top: 4px; }
