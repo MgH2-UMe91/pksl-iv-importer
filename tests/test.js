@@ -625,6 +625,11 @@ async function loadTests() {
   eq('作成の失敗で止まらない', await outcome(Reader.startWorker(() => Promise.reject(new Error('x')), 'eng', {}, 1000)), '失敗');
   eq('言語データの失敗で止まらない', await outcome(Reader.startWorker((lang, o) => { o.errorHandler('404'); return never; }, 'eng', {}, 1000)), '失敗');
   eq('返事がなくても時間切れで止まらない', await outcome(Reader.startWorker(() => never, 'eng', {}, 10)), '失敗');
+  // 公開のたびに、4つの版(sw.js・index.html・style.css・appmenu.js)がそろっていること
+  const txt = async (u) => (await fetch(u, { cache: 'no-store' })).text();
+  const [swT, htmlT, cssT, amT] = [await txt('../sw.js'), await txt('../index.html'), await txt('../css/style.css'), await txt('../js/appmenu.js')];
+  const vs = [/VERSION = '(\d+)'/.exec(swT)?.[1], /name="app-version" content="(\d+)"/.exec(htmlT)?.[1], /--css-version: '(\d+)'/.exec(cssT)?.[1], /FILE_VERSION = '(\d+)'/.exec(amT)?.[1]];
+  eq('版: sw.js・index.html・style.css・appmenu.js が同じ番号', new Set(vs).size === 1 && !!vs[0], true);
 }
 
 loadTests().finally(() => {

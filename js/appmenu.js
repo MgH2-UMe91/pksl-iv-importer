@@ -32,6 +32,16 @@ const AppMenu = (() => {
     return '不明';
   }
 
+  // この4つ(sw.js の VERSION・index.html の meta・style.css の --css-version・この定数)は、公開のたびにそろえる(tests で確かめる)
+  const FILE_VERSION = '53';
+  async function versionDetail() {
+    const sw = await version();
+    const html = document.querySelector('meta[name="app-version"]')?.content ?? '?';
+    const css = getComputedStyle(document.documentElement).getPropertyValue('--css-version').replace(/['"\s]/g, '') || '?';
+    const mixed = new Set([html, css, FILE_VERSION]).size > 1 || (sw !== '不明' && sw !== FILE_VERSION);
+    return `${sw}(画面 ${html}・CSS ${css}・JS ${FILE_VERSION})${mixed ? ' ※版が混ざっています。アプリを完全に終了して、開き直してください' : ''}`;
+  }
+
   async function openAbout() {
     close();
     g('about-version').textContent = '…';
@@ -39,7 +49,7 @@ const AppMenu = (() => {
     const d = g('about-dialog');
     if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
     g('about-title').focus({ preventScroll: true });
-    g('about-version').textContent = await version();
+    g('about-version').textContent = await versionDetail();
   }
 
   function closeAbout() {
