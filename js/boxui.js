@@ -89,7 +89,8 @@ const BoxUi = (() => {
 
   // ---------- BOX タブ: 箱の並び ----------
   function renderTabs() {
-    g('box-tabs').innerHTML = [1, 2].map((n) => `<div class="tab-cell"><button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}"><span class="tn">${esc(nameOf(n))}</span><small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button><button type="button" class="tab-pen" data-rename="${n}" aria-label="${esc(nameOf(n))}の名前を変える">✎︎</button></div>`).join('');
+    g('tab-menu').hidden = true;
+    g('box-tabs').innerHTML = [1, 2].map((n) => `<div class="tab-cell"><button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}"><span class="tn">${esc(nameOf(n))}</span><small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button><button type="button" class="tab-more" data-more="${n}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(nameOf(n))}のメニュー">⋮</button></div>`).join('');
   }
 
   // 全匹をスクロールで見せる(ページ分けはしない)
@@ -174,7 +175,8 @@ const BoxUi = (() => {
   function closeMenus() {
     if (selected !== null) { selected = null; for (const c of g('box-grid').querySelectorAll('.cell.sel')) c.classList.remove('sel'); }
     g('box-cell-menu').hidden = true;
-    for (const id of ['csv-menu', 'sort-menu']) g(id).hidden = true;
+    for (const id of ['csv-menu', 'sort-menu', 'tab-menu']) g(id).hidden = true;
+    for (const b of g('box-tabs').querySelectorAll('[data-more]')) b.setAttribute('aria-expanded', 'false');
     for (const id of ['csv-open', 'sort-open']) g(id).setAttribute('aria-expanded', 'false');
   }
 
@@ -425,7 +427,6 @@ const BoxUi = (() => {
         renderSave(okNow());
       } },
       { label: 'やめる' },
-      ...(boxes[active - 1].rows.length ? [{ label: 'BOXを空にする', cls: 'danger', fn: clear }] : []),
     ], 'box-name');
   }
 
@@ -755,16 +756,26 @@ const BoxUi = (() => {
     g('box-guide2').addEventListener('click', () => Install.guide());
     // BOX の切り替え・絞り込み・ページ送り
     g('box-tabs').addEventListener('click', (ev) => {
-      const pen = ev.target.closest('[data-rename]');
-      const t = pen || ev.target.closest('[data-tab]');
+      const more = ev.target.closest('[data-more]');
+      const t = more || ev.target.closest('[data-tab]');
       if (!t) return;
-      active = Number(pen ? pen.dataset.rename : t.dataset.tab);
+      ev.stopPropagation();
+      active = Number(more ? more.dataset.more : t.dataset.tab);
       onlyFlag = false;
       selected = null;
       endSelect(); // 選んだ番号は、別の BOX では意味がないので外す
       g('box-import-done').textContent = '';
       renderAll();
-      if (pen) rename();
+      if (more) {
+        // 開き直した画面の同じ位置の ⋮ の下にメニューを出す
+        const btn = g('box-tabs').querySelector(`[data-more="${active}"]`);
+        const r = btn.getBoundingClientRect(), m = g('tab-menu');
+        g('tab-clear').disabled = boxes[active - 1].rows.length === 0;
+        m.hidden = false;
+        m.style.top = `${r.bottom + 4}px`;
+        m.style.left = `${Math.max(8, Math.min(r.right - m.offsetWidth, window.innerWidth - m.offsetWidth - 8))}px`;
+        btn.setAttribute('aria-expanded', 'true');
+      }
     });
     g('box-filter').addEventListener('input', firstPage);
     g('box-flag').addEventListener('click', () => { onlyFlag = !onlyFlag; firstPage(); });
@@ -799,7 +810,7 @@ const BoxUi = (() => {
     g('cell-dup').addEventListener('click', duplicateCell);
     // メニューの外を押すと閉じる
     document.addEventListener('click', (ev) => {
-      if (!ev.target.closest('.cell, #box-cell-menu, #csv-menu, #csv-open, #sort-menu, #sort-open')) closeMenus();
+      if (!ev.target.closest('.cell, #box-cell-menu, #tab-menu, [data-more], #csv-menu, #csv-open, #sort-menu, #sort-open')) closeMenus();
     });
     // ⋯ のメニュー
     const toggleMenu = (btnId, menuId) => g(btnId).addEventListener('click', (ev) => {
@@ -811,6 +822,8 @@ const BoxUi = (() => {
     });
     toggleMenu('csv-open', 'csv-menu');
     toggleMenu('sort-open', 'sort-menu');
+    g('tab-rename').addEventListener('click', () => { closeMenus(); rename(); });
+    g('tab-clear').addEventListener('click', () => { closeMenus(); clear(); });
     g('box-file').addEventListener('click', () => { closeMenus(); file(); });
     g('box-copy').addEventListener('click', () => { closeMenus(); copy(); });
     // 編集画面(全画面)。入力・進化・種族の検索は、3の行と同じ処理

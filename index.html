@@ -163,6 +163,10 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
+<div id="tab-menu" class="pop-menu more-menu tab-menu" role="menu" hidden>
+  <button id="tab-rename" type="button" role="menuitem">名前を変える</button>
+  <button id="tab-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
+</div>
 
 <dialog id="filter-dialog" class="modal" aria-labelledby="filter-title">
   <div class="modal-body">
