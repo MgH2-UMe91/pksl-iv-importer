@@ -42,7 +42,7 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   <div class="box-row">
     <div class="box-tabs" id="box-tabs" role="tablist"></div>
   </div>
-  <div class="sel-row">
+  <div class="sel-row" id="sel-row" hidden>
     <span id="box-count" class="note" role="status"></span>
   </div>
 </div>
@@ -143,7 +143,7 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 </div>
 
 <div id="box-bar" class="box-bar" hidden>
-  <div class="bar-part bar-norm">
+  <div class="bar-part bar-norm" id="bar-norm">
   <button id="filter-open" type="button" class="filter-btn" aria-haspopup="dialog" aria-label="絞り込み・並べ替え">🔍 OFF</button>
   <button id="sort-open" type="button" class="sort-btn" aria-haspopup="menu" aria-expanded="false" aria-label="並べ替え">レベル</button>
   <button id="sort-dir" type="button" class="sort-dir" aria-label="並べ替えの向きを逆にする">↓</button>
@@ -151,7 +151,7 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   <button id="csv-open" type="button" aria-haspopup="menu" aria-expanded="false">CSV ▾</button>
   <button id="sel-toggle" type="button" class="sel-toggle" aria-pressed="false">☑ 選択</button>
   </div>
-  <div class="bar-part bar-sel">
+  <div class="bar-part bar-sel" id="bar-sel" hidden>
   <button id="sel-end" type="button" class="x" aria-label="選択を終わる">✕</button>
   <span id="sel-count" class="cnt" role="status"></span>
   <span class="bar-grow"></span>

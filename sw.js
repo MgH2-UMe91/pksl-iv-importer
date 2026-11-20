@@ -4,7 +4,7 @@
 // - vendor/ は大きくて変わらないので保存優先
 // - 一覧にないファイル(tests/ など)と別サイトへの通信には関わらない
 // ファイルを増やすか vendor/ を入れ替えたら、下の一覧を直して VERSION を上げること
-const VERSION = '51';
+const VERSION = '52';
 const PREFIX = 'iv-importer-';
 const CACHE = PREFIX + VERSION;
 const NET_WAIT_MS = 4000;
@@ -42,7 +42,8 @@ self.addEventListener('activate', (ev) => {
 // 読めたら保存し直す。電波が弱くて返事がないときは NET_WAIT_MS で保存したものに切り替える
 async function networkFirst(req, key) {
   const cache = await caches.open(CACHE);
-  const net = fetch(req).then(async (res) => {
+  // ブラウザの一時保存(HTTPキャッシュ)の古い版を使わないよう、毎回サーバーに確かめる
+  const net = fetch(req, { cache: 'no-cache' }).then(async (res) => {
     if (res.ok) await cache.put(key, res.clone());
     return res;
   });

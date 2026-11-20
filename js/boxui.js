@@ -134,6 +134,7 @@ const BoxUi = (() => {
     const filtering = isFiltering();
     g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${v.total}匹中${v.count}匹を表示` : `${total}匹`)
       + (data.broken ? '(一部を読めませんでした)' : '');
+    g('sel-row').hidden = !(total === 0 || filtering || data.broken); // 「265匹」だけの行は出さない(空・絞り込み中・読めなかったときだけ)
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
     g('sel-toggle').disabled = total === 0 && !selectMode;
     g('sort-open').textContent = SORTS.find((x) => x[0] === sortKey)[1];
@@ -480,6 +481,9 @@ const BoxUi = (() => {
     g('sel-toggle').classList.toggle('on', selectMode);
     g('sel-toggle').disabled = !selectMode && boxes[active - 1].rows.length === 0;
     document.documentElement.classList.toggle('selmode', selectMode);
+    // CSSが古くても片方だけが出るように、hidden 属性でも切り替える
+    g('bar-norm').hidden = selectMode;
+    g('bar-sel').hidden = !selectMode;
     g('sel-count').textContent = `${n}匹選択中`;
     const all = Box.view(boxes[active - 1].rows, viewOpts()).order;
     const allPicked = n > 0 && n >= all.length;

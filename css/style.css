@@ -627,3 +627,7 @@ html.boxtab #box-app { padding-top: 0; }
 html.boxtab .box-top { padding-bottom: 2px; }
 html.boxtab .sel-row { min-height: 26px; }
 html.boxtab .box-flag { margin-top: 4px; }
+.bar-part[hidden], .sel-row[hidden] { display: none; }
+html.boxtab .box-top { border-bottom: 0; }
+/* 幅の狭い端末(320px など): 下のバーのボタンを詰めて、はみ出さないようにする */
+@media (max-width: 360px) { .box-bar { gap: 5px; padding-left: 6px; padding-right: 6px; } .box-bar button { padding-left: 9px; padding-right: 9px; font-size: 0.85rem; } .box-bar .sort-dir { flex-basis: 30px; width: 30px; } }
