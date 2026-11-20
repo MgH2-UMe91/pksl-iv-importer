@@ -177,9 +177,9 @@ const BoxUi = (() => {
   function closeMenus() {
     if (selected !== null) { selected = null; for (const c of g('box-grid').querySelectorAll('.cell.sel')) c.classList.remove('sel'); }
     g('box-cell-menu').hidden = true;
-    for (const id of ['csv-menu', 'sort-menu', 'tab-menu']) g(id).hidden = true;
+    for (const id of ['sort-menu', 'tab-menu']) g(id).hidden = true;
     for (const b of g('box-tabs').querySelectorAll('[data-more]')) b.setAttribute('aria-expanded', 'false');
-    for (const id of ['csv-open', 'sort-open']) g(id).setAttribute('aria-expanded', 'false');
+    g('sort-open').setAttribute('aria-expanded', 'false');
   }
 
   function selectCell(i) {
@@ -785,6 +785,7 @@ const BoxUi = (() => {
       const t = more || ev.target.closest('[data-tab]');
       if (!t) return;
       ev.stopPropagation();
+      if (more && !g('tab-menu').hidden && Number(more.dataset.more) === active) { closeMenus(); return; } // 開いている ⋮ をもう一度押したら閉じる
       active = Number(more ? more.dataset.more : t.dataset.tab);
       onlyFlag = false;
       selected = null;
@@ -842,7 +843,7 @@ const BoxUi = (() => {
     g('cell-dup').addEventListener('click', duplicateCell);
     // メニューの外を押すと閉じる
     document.addEventListener('click', (ev) => {
-      if (!ev.target.closest('.cell, #box-cell-menu, #tab-menu, [data-more], #csv-menu, #csv-open, #sort-menu, #sort-open')) closeMenus();
+      if (!ev.target.closest('.cell, #box-cell-menu, #tab-menu, [data-more], #sort-menu, #sort-open')) closeMenus();
     });
     // ⋯ のメニュー
     const toggleMenu = (btnId, menuId) => g(btnId).addEventListener('click', (ev) => {
@@ -852,8 +853,8 @@ const BoxUi = (() => {
       g(menuId).hidden = !open;
       g(btnId).setAttribute('aria-expanded', String(open));
     });
-    toggleMenu('csv-open', 'csv-menu');
     toggleMenu('sort-open', 'sort-menu');
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !g('tab-menu').hidden) closeMenus(); });
     g('tab-rename').addEventListener('click', () => { closeMenus(); rename(); });
     g('tab-clear').addEventListener('click', () => { closeMenus(); clear(); });
     g('box-file').addEventListener('click', () => { closeMenus(); file(); });

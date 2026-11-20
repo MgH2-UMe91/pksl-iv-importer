@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="54">
+<meta name="app-version" content="55">
 <title>IV Importer</title>
 <meta name="apple-mobile-web-app-title" content="IV Importer">
 <meta name="application-name" content="IV Importer">
@@ -149,7 +149,6 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   <button id="sort-open" type="button" class="sort-btn" aria-haspopup="menu" aria-expanded="false" aria-label="並べ替え">レベル</button>
   <button id="sort-dir" type="button" class="sort-dir" aria-label="並べ替えの向きを逆にする">↓</button>
   <span class="bar-grow"></span>
-  <button id="csv-open" type="button" aria-haspopup="menu" aria-expanded="false">CSV ▾</button>
   <button id="sel-toggle" type="button" class="sel-toggle" aria-pressed="false">☑ 選択</button>
   </div>
   <div class="bar-part bar-sel" id="bar-sel" hidden>
@@ -161,14 +160,14 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   </div>
 </div>
 <div id="sort-menu" class="pop-menu more-menu bar-sort" role="menu" hidden></div>
-<div id="csv-menu" class="pop-menu more-menu bar-more bar-csv" role="menu" hidden>
-  <button id="box-import-open" type="button" role="menuitem" aria-haspopup="dialog">CSVを読み込む</button>
-  <button id="box-copy" type="button" role="menuitem">CSVをコピー</button>
-  <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
-</div>
 <div id="toast" class="toast" role="status" hidden></div>
 <div id="tab-menu" class="pop-menu more-menu tab-menu" role="menu" hidden>
   <button id="tab-rename" type="button" role="menuitem">名前を変える</button>
+  <hr>
+  <button id="box-import-open" type="button" role="menuitem" aria-haspopup="dialog">CSVを読み込む</button>
+  <button id="box-copy" type="button" role="menuitem">CSVをコピー</button>
+  <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
+  <hr>
   <button id="tab-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
 </div>
 

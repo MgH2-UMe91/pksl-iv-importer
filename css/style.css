@@ -457,7 +457,7 @@ html.modal-open { overflow: hidden; }
 /* ====== BOX タブの作り直し2: 上部を固定・5列・全匹をスクロール・複数選択 ====== */
 .sticky-top { position: sticky; top: 0; z-index: 20; background: var(--bg); }
 html.standalone .app { padding-top: 0; }
-html.standalone .sticky-top { padding-top: calc(env(safe-area-inset-top, 0px) + 28px); }
+html.standalone .sticky-top { padding-top: calc(env(safe-area-inset-top, 0px) + 6px); } /* ステータスバーの分(safe-area)は残し、余分な上の余白だけ詰める */
 .box-top { max-width: 860px; margin: 0 auto; padding: 6px 8px 4px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
 .box-top .box-tabs button { min-height: 40px; padding: 4px 8px; }
 .box-top .box-tools { margin-top: 0; }
@@ -555,7 +555,6 @@ html.selecting #box-app { padding-bottom: calc(var(--bar-h) + 150px); }
 .box-bar .sort-btn { min-width: 0; }
 .box-bar .sort-dir { flex: 0 0 34px; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; color: #2e7d32; font-weight: 700; }
 .bar-sort { position: fixed; left: 96px; bottom: calc(var(--bar-h) + 4px); z-index: 40; min-width: 130px; }
-.bar-csv { right: 62px; min-width: 170px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bar-h) + 12px); z-index: 60; max-width: 90vw; padding: 9px 16px; border-radius: 20px; background: rgba(30, 30, 30, 0.92); color: #fff; font-size: 0.88rem; text-align: center; }
 
 .ftabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 2px 0 4px; }
@@ -628,7 +627,7 @@ html.boxtab .box-flag { margin-top: 4px; }
 html.boxtab .box-top { border-bottom: 0; }
 /* 幅の狭い端末(320px など): 下のバーのボタンを詰めて、はみ出さないようにする */
 @media (max-width: 360px) { .box-bar { gap: 5px; padding-left: 6px; padding-right: 6px; } .box-bar button { padding-left: 9px; padding-right: 9px; font-size: 0.85rem; } .box-bar .sort-dir { flex-basis: 30px; width: 30px; } }
-:root { --css-version: '54'; } /* 「このアプリについて」に出す。js・index.html・sw.js の版と同じにする */
+:root { --css-version: '55'; } /* 「このアプリについて」に出す。js・index.html・sw.js の版と同じにする */
 
 /* 下のバーのチップの大きさを、にとよんさんの個体値計算機のBOXの下のバーに合わせる(高さ26px・文字12.8px・余白3.2/12.8px・間8px・丸み全開、並べ替えの向きは22px) */
 :root { --bar-h: calc(42px + max(19.2px, env(safe-area-inset-bottom, 0px))); }
@@ -641,3 +640,5 @@ html.boxtab .box-top { border-bottom: 0; }
 .box-bar .x { width: 26px; height: 26px; min-height: 26px; padding: 0; font-size: 0.9rem; }
 .box-bar .cnt { font-size: 0.85rem; }
 @media (max-width: 360px) { .box-bar { gap: 6px; padding-left: 6px; padding-right: 6px; } .box-bar button { padding-left: 10px; padding-right: 10px; } .box-bar .sort-dir { flex-basis: 22px; width: 22px; } }
+.tab-menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 2px 0; }
+.tab-menu button:disabled { opacity: 0.4; }
