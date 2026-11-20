@@ -122,7 +122,8 @@ const BoxUi = (() => {
     const data = boxes[active - 1];
     const v = Box.view(data.rows, viewOpts());
     if (onlyFlag && !v.flagged) onlyFlag = false; // 要確認がなくなったら、絞り込みを外す
-    picked = new Set([...picked].filter((i) => i < data.rows.length));
+    picked = Box.visiblePicked(picked, v.order); // 見えていない個体は選ばれたままにしない
+    if (selectMode && data.rows.length === 0) { selectMode = false; picked = new Set(); closeOpsSheet(); g('sel-msg').textContent = ''; } // 0匹になったら選択を終える
     g('box-grid').innerHTML = v.items.map(cellHtml).join('');
     const total = data.rows.length;
     const flagged = v.flagged; // 辞書にない値などで、出力できない個体
@@ -506,6 +507,9 @@ const BoxUi = (() => {
     updateSelUi();
   }
 
+  // 成功の知らせ。0匹になって選択が終わったあとは、バーが出ないのでトーストで知らせる
+  function selDone(text) { if (selectMode) selMsg(text, false); else toast(text); }
+
   function updateSelUi() {
     const n = picked.size;
     g('sel-toggle').setAttribute('aria-pressed', String(selectMode));
@@ -517,7 +521,7 @@ const BoxUi = (() => {
     g('bar-sel').hidden = !selectMode;
     g('sel-count').textContent = `${n}匹選択中`;
     const all = Box.view(boxes[active - 1].rows, viewOpts()).order;
-    const allPicked = n > 0 && n >= all.length;
+    const allPicked = Box.allPicked(picked, all);
     g('sel-all').textContent = allPicked ? '外す' : '全部';
     g('sel-ops').disabled = n === 0;
     if (n === 0) closeOpsSheet();
@@ -540,10 +544,13 @@ const BoxUi = (() => {
     g('sel-move-room').textContent = `${nameOf(to)} ${boxes[to - 1].rows.length}/${Box.MAX}`;
     g('sel-sheet').hidden = false;
     g('sel-ops').setAttribute('aria-expanded', 'true');
+    g('sel-copy').focus({ preventScroll: true });
   }
   function closeOpsSheet() {
+    if (g('sel-sheet').hidden) return;
     g('sel-sheet').hidden = true;
     g('sel-ops').setAttribute('aria-expanded', 'false');
+    if (!g('sel-ops').disabled) g('sel-ops').focus({ preventScroll: true }); // 閉じたら「操作」へ戻す
   }
   const afterSheet = (fn) => () => { closeOpsSheet(); fn(); };
 
@@ -592,7 +599,7 @@ const BoxUi = (() => {
     renderTabs();
     renderGrid();
     renderSave(okNow());
-    selMsg(`${moving.length}匹を${nameOf(to)}へ移しました。`, false);
+    selDone(`${moving.length}匹を${nameOf(to)}へ移しました。`);
   }
 
   function selDelete() {
@@ -606,7 +613,7 @@ const BoxUi = (() => {
         renderTabs();
         renderGrid();
         renderSave(okNow());
-        selMsg(`${n}匹を消しました。`, false);
+        selDone(`${n}匹を消しました。`);
       } },
       { label: 'やめる' },
     ]);
@@ -817,11 +824,16 @@ const BoxUi = (() => {
       if (!t) return;
       ev.stopPropagation();
       if (more && !g('tab-menu').hidden && Number(more.dataset.more) === active) { closeMenus(); return; } // 開いている ⋮ をもう一度押したら閉じる
-      active = Number(more ? more.dataset.more : t.dataset.tab);
-      onlyFlag = false;
+      closeMenus(); // 並べ替えなどのメニューが開いていたら閉じる
+      document.dispatchEvent(new CustomEvent('boxtab-press')); // アプリのメニューも閉じる
+      const next = Number(more ? more.dataset.more : t.dataset.tab);
       selected = null;
-      endSelect(); // 選んだ番号は、別の BOX では意味がないので外す
-      g('box-import-done').textContent = '';
+      if (next !== active) {
+        active = next;
+        onlyFlag = false;
+        endSelect(); // 選んだ番号は、別の BOX では意味がないので外す(同じBOXなら選択を残す)
+        g('box-import-done').textContent = '';
+      }
       renderAll();
       if (more) {
         // 開き直した画面の同じ位置の ⋮ の下にメニューを出す
@@ -850,7 +862,7 @@ const BoxUi = (() => {
     g('sel-end').addEventListener('click', endSelect);
     g('sel-all').addEventListener('click', () => {
       const order = Box.view(boxes[active - 1].rows, viewOpts()).order;
-      picked = picked.size > 0 && picked.size >= order.length ? new Set() : Box.selectAll(order); // 全部選ばれているときは、外す
+      picked = Box.allPicked(picked, order) ? new Set() : Box.selectAll(order); // 表示中の全員が選ばれているときは、外す
       g('sel-msg').textContent = '';
       updateSelUi();
     });
@@ -885,7 +897,11 @@ const BoxUi = (() => {
       g(btnId).setAttribute('aria-expanded', String(open));
     });
     toggleMenu('sort-open', 'sort-menu');
-    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !g('tab-menu').hidden) closeMenus(); });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return;
+      if (!g('sel-sheet').hidden) closeOpsSheet();
+      else if (!g('tab-menu').hidden) closeMenus();
+    });
     document.addEventListener('pointerdown', (ev) => { if (g('toast').classList.contains('has-action') && !g('toast').hidden && !ev.target.closest('#toast')) hideToast(); }, true);
     g('tab-rename').addEventListener('click', () => { closeMenus(); rename(); });
     g('tab-clear').addEventListener('click', () => { closeMenus(); clear(); });

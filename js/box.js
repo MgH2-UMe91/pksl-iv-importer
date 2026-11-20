@@ -120,6 +120,10 @@ const Box = (() => {
   const pageOf = (order, idx) => { const p = order.indexOf(idx); return p < 0 ? 0 : Math.floor(p / PAGE_SIZE); };
   const removeAt = (rows, idx) => rows.filter((_, i) => i !== idx);
 
+  // 表示中(order)にない番号は、選択から外す。表示中の全員が選ばれているか
+  const visiblePicked = (picked, order) => { const shown = new Set(order); return new Set([...picked].filter((i) => shown.has(i))); };
+  const allPicked = (picked, order) => order.length > 0 && order.every((i) => picked.has(i));
+
   // 1匹の移動を取り消す。dst の中にある row(同じ内容のうち、あとのもの)を取り出し、src の idx 番目へ戻す。
   // 返す値: { ok, src, dst } か { ok: false, reason: 'gone'(もう動かしてあって見つからない) | 'full'(元のBOXがいっぱい) }
   function undoMove(srcRows, dstRows, idx, row) {
@@ -183,5 +187,5 @@ const Box = (() => {
 
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, typeOf, noOf, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, duplicate, canMove, bulkApply, neighbor, pageOf, removeAt, undoMove, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, typeOf, noOf, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, duplicate, canMove, bulkApply, neighbor, pageOf, removeAt, undoMove, visiblePicked, allPicked, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
 })();

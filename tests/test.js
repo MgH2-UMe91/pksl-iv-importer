@@ -624,6 +624,14 @@ eq('上の帯が細く切れている画面', spot(Reader.locate(screen(nameCard
 eq('メインスキルの枠がなければ見つからない', Reader.locate(screen(nameCard, band(7), skillBand, statusBand)), null);
 eq('詳細ステータスの帯がなければ見つからない', Reader.locate(screen(nameCard, band(7), skillBand, ...frame)), null);
 
+// 選択: 表示を絞ったら、見えない個体は選ばれたままにしない
+eq('絞ると、見えない個体の選択が外れる', [...Box.visiblePicked(new Set([0, 1, 2, 5]), [1, 5, 7])].sort(), [1, 5]);
+eq('表示中が空なら、選択も空', Box.visiblePicked(new Set([0, 1]), []).size, 0);
+eq('表示中の全員が選ばれていれば「外す」', Box.allPicked(new Set([1, 5, 7]), [1, 5, 7]), true);
+eq('選んだ数が同じでも、見えない個体なら「全部」のまま', Box.allPicked(new Set([0, 1, 2]), [3, 4, 5]), false);
+eq('表示中の一部だけなら「全部」', Box.allPicked(new Set([1]), [1, 5]), false);
+eq('表示中が0匹なら「全部」', Box.allPicked(new Set([1]), []), false);
+
 // 読み取り用データの読み込み。失敗しても止まらない
 const outcome = (p) => p.then((v) => `成功 ${v}`, () => '失敗');
 async function loadTests() {
@@ -638,9 +646,18 @@ async function loadTests() {
   const vs = [/VERSION = '(\d+)'/.exec(swT)?.[1], /name="app-version" content="(\d+)"/.exec(htmlT)?.[1], /--css-version: '(\d+)'/.exec(cssT)?.[1], /FILE_VERSION = '(\d+)'/.exec(amT)?.[1]];
   // 同じ名前の関数を2つ書くと、あとのものが前のものを上書きしてしまう(版55で「編集」が開かなくなった原因)
   for (const f of ['boxui.js', 'app.js', 'reader.js', 'match.js', 'box.js', 'appmenu.js', 'import.js', 'install.js']) {
-    const names = [...(await txt('../js/' + f)).matchAll(/^[ 	]*(?:async )?function (\w+)/gm)].map((m) => m[1]);
+    const src = await txt('../js/' + f);
+    // function 名前 と、const/let 名前 = (...) => の形(IIFE 直下=インデント2まで。関数の中の局所変数は別物)の両方(同じ名前を2回書くと、あとのものが前のものを上書きする)
+    const names = [...src.matchAll(/^[ 	]*(?:async )?function (\w+)/gm), ...src.matchAll(/^ {0,2}(?:const|let) (\w+) = (?:async )?(?:\([^)]*\)|\w+) =>/gm)].map((m) => m[1]);
     eq(`関数名の重複がない: ${f}`, names.filter((n, i) => names.indexOf(n) !== i), []);
   }
+  // app.js と data/*.js と js/*.js のトップレベルの名前(行頭の const/let/var/function/class)が、ファイルをまたいで重複しないこと
+  const top = new Map();
+  for (const f of ['../js/app.js', ...['berryfeat', 'dict', 'evolution', 'icons', 'ingcolor', 'pokeicons', 'pokemon', 'skills'].map((n) => `../data/${n}.js`), ...['appmenu', 'box', 'boxui', 'csv', 'import', 'install', 'match', 'reader', 'theme'].map((n) => `../js/${n}.js`)]) {
+    for (const m of (await txt(f)).matchAll(/^(?:async function|function|const|let|var|class) (\w+)/gm)) top.set(m[1], [...(top.get(m[1]) ?? []), f]);
+  }
+  eq('トップレベルの名前がファイルをまたいで重複しない', [...top].filter(([, fs]) => fs.length > 1), []);
+  eq('成功の知らせに警告の色を付けない', /\.sel-bar \.box-warn\.ok \{ color: var\(--text\)/.test(cssT), true);
   eq('版: sw.js・index.html・style.css・appmenu.js が同じ番号', new Set(vs).size === 1 && !!vs[0], true);
 }
 

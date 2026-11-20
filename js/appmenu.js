@@ -33,7 +33,7 @@ const AppMenu = (() => {
   }
 
   // この4つ(sw.js の VERSION・index.html の meta・style.css の --css-version・この定数)は、公開のたびにそろえる(tests で確かめる)
-  const FILE_VERSION = '57';
+  const FILE_VERSION = '58';
   async function versionDetail() {
     const sw = await version();
     const html = document.querySelector('meta[name="app-version"]')?.content ?? '?';
@@ -82,6 +82,7 @@ const AppMenu = (() => {
     g('about-dialog').addEventListener('cancel', () => document.documentElement.classList.remove('modal-open'));
     document.addEventListener('click', (ev) => { if (!ev.target.closest('#app-menu, #app-menu-btn')) close(); });
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') close(); });
+    document.addEventListener('boxtab-press', close); // BOXのタブは click を止めるので、別に知らせてもらう
   }
 
   return { init, version };
