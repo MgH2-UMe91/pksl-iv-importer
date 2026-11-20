@@ -120,6 +120,18 @@ const Box = (() => {
   const pageOf = (order, idx) => { const p = order.indexOf(idx); return p < 0 ? 0 : Math.floor(p / PAGE_SIZE); };
   const removeAt = (rows, idx) => rows.filter((_, i) => i !== idx);
 
+  // 1匹の移動を取り消す。dst の中にある row(同じ内容のうち、あとのもの)を取り出し、src の idx 番目へ戻す。
+  // 返す値: { ok, src, dst } か { ok: false, reason: 'gone'(もう動かしてあって見つからない) | 'full'(元のBOXがいっぱい) }
+  function undoMove(srcRows, dstRows, idx, row) {
+    const key = JSON.stringify(row);
+    let k = -1;
+    for (let j = dstRows.length - 1; j >= 0; j--) if (JSON.stringify(dstRows[j]) === key) { k = j; break; }
+    if (k < 0) return { ok: false, reason: 'gone' };
+    if (srcRows.length >= MAX) return { ok: false, reason: 'full' };
+    const at = Math.max(0, Math.min(idx, srcRows.length));
+    return { ok: true, src: [...srcRows.slice(0, at), row, ...srcRows.slice(at)], dst: removeAt(dstRows, k) };
+  }
+
   // 性格の補正。[上がる項目, 下がる項目]。補正のない5つ(がんばりや・すなお・てれや・きまぐれ・まじめ)は含めない
   // 出どころ: ユーザーが出した一覧表(行が上がる項目、列が下がる項目。対角が補正なし)
   const SPEED = 'おてつだいスピード', ING = '食材おてつだい確率', SKILL = 'メインスキル発生確率', EXP = 'EXP獲得量', ENERGY = 'げんき回復量';
@@ -171,5 +183,5 @@ const Box = (() => {
 
   const csv = (rows) => Csv.build(rows.map(unpack));
 
-  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, typeOf, noOf, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, duplicate, canMove, bulkApply, neighbor, pageOf, removeAt, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
+  return { MAX, COUNT, NAME_MAX, key, defaultName, cleanName, nameOf, fileName, pack, unpack, load, save, bytes, plan, replaceAt, needsCheck, lowKeys, view, typeOf, noOf, PAGE_SIZE, splitName, toggleSelection, selectAll, pick, removeMany, duplicate, canMove, bulkApply, neighbor, pageOf, removeAt, undoMove, natureEffect, NATURE_FX, loadTab, saveTab, TAB_KEY, clipboardNotice, csv };
 })();

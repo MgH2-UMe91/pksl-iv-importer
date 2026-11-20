@@ -207,14 +207,26 @@ const BoxUi = (() => {
     ]);
   }
 
-  // 画面の下に一言だけ出す(2秒で消える)
+  // 画面の下に一言だけ出す(2.5秒で消える)。action({ label, fn })があれば、取り消しのボタンを付けて5秒出す。次の操作で消える
   let toastTimer = 0;
-  function toast(text) {
+  function hideToast() {
+    clearTimeout(toastTimer);
+    g('toast').hidden = true;
+  }
+  function toast(text, action = null) {
     const t = g('toast');
     t.textContent = text;
+    t.classList.toggle('has-action', !!action);
+    if (action) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { hideToast(); action.fn(); });
+      t.append(b);
+    }
     t.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.hidden = true; }, 2500);
+    toastTimer = setTimeout(() => { t.hidden = true; }, action ? 5000 : 2500);
   }
 
   // メニューの「BOXへ移動」: もう一方の BOX へ1匹移す。入らなければ移さず、理由を出す
@@ -225,7 +237,8 @@ const BoxUi = (() => {
     const plan = Box.canMove(1, boxes[to - 1].rows.length);
     if (!plan.fits) { ask(`${esc(nameOf(to))}は${Box.MAX}匹までで、いっぱいです。1匹も移せません。`, [{ label: '閉じる' }]); return; }
     const dst = boxes[to - 1], src = boxes[from - 1];
-    if (!Box.save(to, { name: dst.name, rows: dst.rows.concat(Box.pick(src.rows, [i])) })) { toast('保存できませんでした。端末の空き容量を確かめてください。'); return; }
+    const moved = Box.pick(src.rows, [i])[0];
+    if (!Box.save(to, { name: dst.name, rows: dst.rows.concat([moved]) })) { toast('保存できませんでした。端末の空き容量を確かめてください。'); return; }
     if (!Box.save(from, { name: src.name, rows: Box.removeAt(src.rows, i) })) {
       Box.save(to, { name: dst.name, rows: dst.rows }); // 元に戻す(二重にならないように)
       toast('保存できませんでした。端末の空き容量を確かめてください。');
@@ -235,7 +248,25 @@ const BoxUi = (() => {
     boxes[from - 1] = Box.load(from);
     renderAll();
     renderSave(okNow());
-    toast(`1匹を${nameOf(to)}へ移しました。`);
+    toast(`${nameOf(to)}へ移動しました`, { label: '取り消す', fn: () => undoMoveCell(from, to, i, moved) });
+  }
+
+  // 移動の取り消し: 元のBOXの元の位置へ戻す。戻せないときは理由を出して何もしない
+  function undoMoveCell(from, to, i, row) {
+    const r = Box.undoMove(boxes[from - 1].rows, boxes[to - 1].rows, i, row);
+    if (!r.ok) { toast(r.reason === 'full' ? `${nameOf(from)}がいっぱいで、戻せません。` : '移した個体が見つからないので、戻せません。'); return; }
+    const src = boxes[from - 1], dst = boxes[to - 1];
+    if (!Box.save(from, { name: src.name, rows: r.src })) { toast('保存できませんでした。端末の空き容量を確かめてください。'); return; }
+    if (!Box.save(to, { name: dst.name, rows: r.dst })) {
+      Box.save(from, { name: src.name, rows: src.rows }); // 元に戻す(二重にならないように)
+      toast('保存できませんでした。端末の空き容量を確かめてください。');
+      return;
+    }
+    boxes[from - 1] = Box.load(from);
+    boxes[to - 1] = Box.load(to);
+    renderAll();
+    renderSave(okNow());
+    toast(`${nameOf(from)}へ戻しました`);
   }
 
   // メニューの「複製」: 同じ個体を、このBOXの最後に1匹足す
@@ -855,6 +886,7 @@ const BoxUi = (() => {
     });
     toggleMenu('sort-open', 'sort-menu');
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !g('tab-menu').hidden) closeMenus(); });
+    document.addEventListener('pointerdown', (ev) => { if (g('toast').classList.contains('has-action') && !g('toast').hidden && !ev.target.closest('#toast')) hideToast(); }, true);
     g('tab-rename').addEventListener('click', () => { closeMenus(); rename(); });
     g('tab-clear').addEventListener('click', () => { closeMenus(); clear(); });
     g('box-file').addEventListener('click', () => { closeMenus(); file(); });

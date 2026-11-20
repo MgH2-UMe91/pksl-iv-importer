@@ -170,6 +170,13 @@ eq('名前が空なら既定の名前に戻る', Box.nameOf({ name: Box.cleanNam
 eq('付けた名前を使う', Box.nameOf({ name: '本命' }, 1), '本命');
 eq('ファイル名に使えない記号は _ にする', Box.fileName('a/b:c*d?e"f<g>h|i' + String.fromCharCode(92) + 'j'), 'a_b_c_d_e_f_g_h_i_j.csv');
 eq('普通の名前はそのままファイル名にする', Box.fileName('本命BOX'), '本命BOX.csv');
+const mvRows = ['a', 'b', 'c', 'd'].map((n) => ({ n }));
+eq('移動の取り消し: 元の位置(2番目)に戻り、移した先から消える', (() => { const r = Box.undoMove([mvRows[0], mvRows[2], mvRows[3]], [{ x: 1 }, mvRows[1]], 1, mvRows[1]); return [r.ok, r.src.map((x) => x.n), r.dst]; })(), [true, ['a', 'b', 'c', 'd'], [{ x: 1 }]]);
+eq('移動の取り消し: 元のBOXが短くなっていても最後に戻る', (() => { const r = Box.undoMove([mvRows[0]], [mvRows[3]], 5, mvRows[3]); return r.src.map((x) => x.n); })(), ['a', 'd']);
+eq('移動の取り消し: 先頭に戻せる', (() => { const r = Box.undoMove([mvRows[1]], [mvRows[0]], 0, mvRows[0]); return r.src.map((x) => x.n); })(), ['a', 'b']);
+eq('移動の取り消し: 同じ内容が2つあるときは、あとのほうを戻す', (() => { const r = Box.undoMove([], [mvRows[0], { n: 'z' }, mvRows[0]], 0, mvRows[0]); return [r.ok, r.dst.map((x) => x.n)]; })(), [true, ['a', 'z']]);
+eq('移動の取り消し: 元のBOXが満杯なら戻さない', Box.undoMove(Array.from({ length: Box.MAX }, () => ({})), [mvRows[0]], 0, mvRows[0]), { ok: false, reason: 'full' });
+eq('移動の取り消し: 移した先から無くなっていたら戻さない', Box.undoMove([], [mvRows[1]], 0, mvRows[0]), { ok: false, reason: 'gone' });
 eq('250匹入っているBOXに70匹は入らない', Box.plan(70, [250, 0]), [{ fits: false, room: 50 }, { fits: true, room: 300 }]);
 eq('ちょうど300匹になるなら入る', Box.plan(50, [250, 300]), [{ fits: true, room: 50 }, { fits: false, room: 0 }]);
 eq('両方に入らないこともある', Box.plan(100, [250, 280]).map((x) => x.fits), [false, false]);
