@@ -489,7 +489,7 @@ const BoxUi = (() => {
     const allPicked = n > 0 && n >= all.length;
     g('sel-all').textContent = allPicked ? '外す' : '全部';
     g('sel-ops').disabled = n === 0;
-    if (n === 0) closeSheet();
+    if (n === 0) closeOpsSheet();
     const hasMsg = !!g('sel-msg').textContent;
     g('sel-bar').hidden = !(selectMode && hasMsg);
     document.documentElement.classList.toggle('selecting', selectMode && hasMsg);
@@ -501,7 +501,7 @@ const BoxUi = (() => {
   }
 
   // 「操作」で下から出るシート
-  function openSheet() {
+  function openOpsSheet() {
     if (!picked.size) return;
     const to = 3 - active;
     g('sel-sheet-title').textContent = `${picked.size}匹を…`;
@@ -510,11 +510,11 @@ const BoxUi = (() => {
     g('sel-sheet').hidden = false;
     g('sel-ops').setAttribute('aria-expanded', 'true');
   }
-  function closeSheet() {
+  function closeOpsSheet() {
     g('sel-sheet').hidden = true;
     g('sel-ops').setAttribute('aria-expanded', 'false');
   }
-  const afterSheet = (fn) => () => { closeSheet(); fn(); };
+  const afterSheet = (fn) => () => { closeOpsSheet(); fn(); };
 
   function startSelect() {
     closeMenus();
@@ -525,7 +525,7 @@ const BoxUi = (() => {
   }
 
   function endSelect() {
-    closeSheet();
+    closeOpsSheet();
     selectMode = false;
     picked = new Set();
     g('sel-msg').textContent = '';
@@ -823,9 +823,9 @@ const BoxUi = (() => {
       g('sel-msg').textContent = '';
       updateSelUi();
     });
-    g('sel-ops').addEventListener('click', openSheet);
-    g('sel-sheet-close').addEventListener('click', closeSheet);
-    g('sel-backdrop').addEventListener('click', closeSheet);
+    g('sel-ops').addEventListener('click', openOpsSheet);
+    g('sel-sheet-close').addEventListener('click', closeOpsSheet);
+    g('sel-backdrop').addEventListener('click', closeOpsSheet);
     g('sel-copy').addEventListener('click', afterSheet(selCopy));
     g('sel-move').addEventListener('click', afterSheet(selMove));
     g('sel-edit').addEventListener('click', afterSheet(openBulk));

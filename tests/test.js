@@ -629,6 +629,11 @@ async function loadTests() {
   const txt = async (u) => (await fetch(u, { cache: 'no-store' })).text();
   const [swT, htmlT, cssT, amT] = [await txt('../sw.js'), await txt('../index.html'), await txt('../css/style.css'), await txt('../js/appmenu.js')];
   const vs = [/VERSION = '(\d+)'/.exec(swT)?.[1], /name="app-version" content="(\d+)"/.exec(htmlT)?.[1], /--css-version: '(\d+)'/.exec(cssT)?.[1], /FILE_VERSION = '(\d+)'/.exec(amT)?.[1]];
+  // 同じ名前の関数を2つ書くと、あとのものが前のものを上書きしてしまう(版55で「編集」が開かなくなった原因)
+  for (const f of ['boxui.js', 'app.js', 'reader.js', 'match.js', 'box.js', 'appmenu.js', 'import.js', 'install.js']) {
+    const names = [...(await txt('../js/' + f)).matchAll(/^[ 	]*(?:async )?function (\w+)/gm)].map((m) => m[1]);
+    eq(`関数名の重複がない: ${f}`, names.filter((n, i) => names.indexOf(n) !== i), []);
+  }
   eq('版: sw.js・index.html・style.css・appmenu.js が同じ番号', new Set(vs).size === 1 && !!vs[0], true);
 }
 
