@@ -429,9 +429,6 @@ main { padding-top: 12px; }
 .cell .c-ing { display: flex; gap: 1px; margin-top: 1px; }
 .ico.xs { width: 16px; height: 16px; padding: 1px; flex: 0 0 auto; }
 .ico.xs.none { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: var(--muted); }
-.box-actions { display: flex; gap: 8px; margin-top: 8px; }
-.box-actions button { flex: 1 1 auto; }
-.box-actions #box-more-btn { flex: 0 0 52px; }
 .more-menu { min-width: 180px; }
 
 /* 個体の編集画面(全画面) */
@@ -486,7 +483,6 @@ html.standalone .sticky-top { padding-top: calc(env(safe-area-inset-top, 0px) + 
 .cell.chk { background: var(--accent); border-color: var(--accent); color: var(--accent-text); position: relative; }
 .cell.chk .c-nick, .cell.chk .c-lv { color: var(--accent-text); }
 .cell.chk::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 11px; font-weight: 700; color: var(--accent-text); }
-.box-actions { margin-top: 12px; }
 html.selecting #box-app { padding-bottom: 120px; }
 .sel-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25); }
 .sel-bar .box-warn { margin: 0 0 4px; font-size: 0.82rem; line-height: 1.35; }
@@ -501,7 +497,6 @@ html.selecting #box-app { padding-bottom: 120px; }
 .box-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; gap: 6px; align-items: center; padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15); }
 .box-bar button { min-height: 44px; padding: 4px 8px; font-size: 0.9rem; }
 .box-bar #box-import-open, .box-bar #box-copy { flex: 1 1 auto; }
-.box-bar #box-more-btn { flex: 0 0 48px; padding: 0; }
 .box-bar .filter-btn { flex: 0 0 auto; min-width: 84px; font-weight: 700; }
 .box-bar .filter-btn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .bar-more { position: fixed; right: 8px; bottom: calc(var(--bar-h) + 4px); z-index: 40; }
@@ -533,7 +528,6 @@ html.selecting #box-app { padding-bottom: calc(var(--bar-h) + 150px); }
 .box-row .box-tabs button { flex: 0 0 auto; max-width: 48%; border-radius: 18px; min-height: 36px; padding: 4px 14px; }
 .box-row .box-tabs button.selected { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 700; }
 .box-row .box-tabs small { opacity: 0.8; }
-.sel-start { flex: 0 0 auto; border-radius: 18px; min-height: 36px; padding: 4px 14px; background: none; border: 1px solid var(--accent); color: var(--accent); }
 
 .box-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px 0; width: 100%; padding: 0; }
 .cell { position: relative; display: block; align-items: initial; text-align: center; padding: 3px 0; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text); overflow: visible; margin: 0 2px; line-height: 1.2; }
@@ -563,7 +557,6 @@ html.selecting #box-app { padding-bottom: calc(var(--bar-h) + 150px); }
 .box-bar .filter-btn.on { background: #ffe9a0; color: #222; outline: 2px solid #fff; }
 .box-bar .sort-btn { min-width: 0; }
 .box-bar .sort-dir { flex: 0 0 34px; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; color: #2e7d32; font-weight: 700; }
-.box-bar #box-more-btn { flex: 0 0 48px; padding: 0; }
 .bar-sort { position: fixed; left: 96px; bottom: calc(var(--bar-h) + 4px); z-index: 40; min-width: 130px; }
 .bar-csv { right: 62px; min-width: 170px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--bar-h) + 12px); z-index: 60; max-width: 90vw; padding: 9px 16px; border-radius: 20px; background: rgba(30, 30, 30, 0.92); color: #fff; font-size: 0.88rem; text-align: center; }
@@ -598,4 +591,14 @@ html.selecting #box-app { padding-bottom: calc(var(--bar-h) + 150px); }
 .box-row .box-tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; max-width: none; min-width: 0; min-height: 48px; padding: 3px 8px; border-radius: 12px; line-height: 1.2; }
 .box-row .box-tabs .tn { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
 .box-row .box-tabs small { display: block; font-size: 0.72rem; }
-.sel-row .sel-start { flex: 0 0 auto; }
+/* BOXの切り替えのタブ: 右に ⋮(名前を変える・BOXを空にする) */
+.box-row .box-tabs .tab-cell { position: relative; min-width: 0; }
+.box-row .box-tabs .tab-cell > button[data-tab] { width: 100%; padding-right: 30px; }
+.box-row .box-tabs .tab-more { position: absolute; top: 50%; right: 3px; transform: translateY(-50%); width: 28px; min-width: 0; height: 36px; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text); font-size: 1.3rem; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.box-row .box-tabs .tab-cell > button.selected + .tab-more { color: var(--accent-text); }
+.box-row .box-tabs .tab-more:hover { background: rgba(127, 127, 127, 0.25); }
+.tab-menu { position: fixed; z-index: 40; }
+.tab-menu button:disabled { opacity: 0.4; }
+/* 下の帯の「☑ 選択」。選択中は塗りつぶす */
+.box-bar .sel-toggle { flex: 0 0 auto; min-width: 84px; font-weight: 700; padding: 0 12px; }
+.box-bar .sel-toggle.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }

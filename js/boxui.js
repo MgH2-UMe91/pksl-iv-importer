@@ -89,7 +89,8 @@ const BoxUi = (() => {
 
   // ---------- BOX タブ: 箱の並び ----------
   function renderTabs() {
-    g('box-tabs').innerHTML = [1, 2].map((n) => `<button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}"><span class="tn">${esc(nameOf(n))}</span><small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button>`).join('');
+    g('tab-menu').hidden = true;
+    g('box-tabs').innerHTML = [1, 2].map((n) => `<div class="tab-cell"><button type="button" role="tab" aria-selected="${n === active}" data-tab="${n}" class="${n === active ? 'selected' : ''}"><span class="tn">${esc(nameOf(n))}</span><small>${boxes[n - 1].rows.length}/${Box.MAX}</small></button><button type="button" class="tab-more" data-more="${n}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(nameOf(n))}のメニュー">⋮</button></div>`).join('');
   }
 
   // 全匹をスクロールで見せる(ページ分けはしない)
@@ -132,9 +133,8 @@ const BoxUi = (() => {
     const filtering = isFiltering();
     g('box-count').textContent = (total === 0 ? 'このBOXは空です。' : filtering ? `${v.total}匹中${v.count}匹を表示` : `${total}匹`)
       + (data.broken ? '(一部を読めませんでした)' : '');
-    g('box-clear').disabled = total === 0;
     for (const id of ['box-copy', 'box-file']) g(id).disabled = total === 0 || flagged > 0; // 3の4と同じく、直す項目が残っている間は出さない
-    g('sel-start').disabled = total === 0;
+    g('sel-toggle').disabled = total === 0 && !selectMode;
     g('sort-open').textContent = SORTS.find((x) => x[0] === sortKey)[1];
     g('sort-dir').textContent = reverse ? '↑' : '↓';
     const fb2 = g('filter-open');
@@ -175,8 +175,9 @@ const BoxUi = (() => {
   function closeMenus() {
     if (selected !== null) { selected = null; for (const c of g('box-grid').querySelectorAll('.cell.sel')) c.classList.remove('sel'); }
     g('box-cell-menu').hidden = true;
-    for (const id of ['box-more', 'csv-menu', 'sort-menu']) g(id).hidden = true;
-    for (const id of ['box-more-btn', 'csv-open', 'sort-open']) g(id).setAttribute('aria-expanded', 'false');
+    for (const id of ['csv-menu', 'sort-menu', 'tab-menu']) g(id).hidden = true;
+    for (const b of g('box-tabs').querySelectorAll('[data-more]')) b.setAttribute('aria-expanded', 'false');
+    for (const id of ['csv-open', 'sort-open']) g(id).setAttribute('aria-expanded', 'false');
   }
 
   function selectCell(i) {
@@ -474,7 +475,9 @@ const BoxUi = (() => {
 
   function updateSelUi() {
     const n = picked.size;
-    g('sel-start').hidden = selectMode;
+    g('sel-toggle').setAttribute('aria-pressed', String(selectMode));
+    g('sel-toggle').classList.toggle('on', selectMode);
+    g('sel-toggle').disabled = !selectMode && boxes[active - 1].rows.length === 0;
     g('box-count').hidden = selectMode;
     g('sel-tools').hidden = !selectMode;
     g('sel-count').textContent = `${n}匹選択中`;
@@ -753,14 +756,26 @@ const BoxUi = (() => {
     g('box-guide2').addEventListener('click', () => Install.guide());
     // BOX の切り替え・絞り込み・ページ送り
     g('box-tabs').addEventListener('click', (ev) => {
-      const t = ev.target.closest('[data-tab]');
+      const more = ev.target.closest('[data-more]');
+      const t = more || ev.target.closest('[data-tab]');
       if (!t) return;
-      active = Number(t.dataset.tab);
+      ev.stopPropagation();
+      active = Number(more ? more.dataset.more : t.dataset.tab);
       onlyFlag = false;
       selected = null;
       endSelect(); // 選んだ番号は、別の BOX では意味がないので外す
       g('box-import-done').textContent = '';
       renderAll();
+      if (more) {
+        // 開き直した画面の同じ位置の ⋮ の下にメニューを出す
+        const btn = g('box-tabs').querySelector(`[data-more="${active}"]`);
+        const r = btn.getBoundingClientRect(), m = g('tab-menu');
+        g('tab-clear').disabled = boxes[active - 1].rows.length === 0;
+        m.hidden = false;
+        m.style.top = `${r.bottom + 4}px`;
+        m.style.left = `${Math.max(8, Math.min(r.right - m.offsetWidth, window.innerWidth - m.offsetWidth - 8))}px`;
+        btn.setAttribute('aria-expanded', 'true');
+      }
     });
     g('box-filter').addEventListener('input', firstPage);
     g('box-flag').addEventListener('click', () => { onlyFlag = !onlyFlag; firstPage(); });
@@ -774,7 +789,7 @@ const BoxUi = (() => {
       if (selected === i) closeMenus(); else selectCell(i);
     });
     // 複数選択
-    g('sel-start').addEventListener('click', startSelect);
+    g('sel-toggle').addEventListener('click', () => { if (selectMode) endSelect(); else startSelect(); });
     g('sel-end').addEventListener('click', endSelect);
     g('sel-all').addEventListener('click', () => { picked = Box.selectAll(Box.view(boxes[active - 1].rows, viewOpts()).order); g('sel-msg').textContent = ''; updateSelUi(); });
     g('sel-none').addEventListener('click', () => { picked = new Set(); g('sel-msg').textContent = ''; updateSelUi(); });
@@ -795,7 +810,7 @@ const BoxUi = (() => {
     g('cell-dup').addEventListener('click', duplicateCell);
     // メニューの外を押すと閉じる
     document.addEventListener('click', (ev) => {
-      if (!ev.target.closest('.cell, #box-cell-menu, #box-more, #box-more-btn, #csv-menu, #csv-open, #sort-menu, #sort-open')) closeMenus();
+      if (!ev.target.closest('.cell, #box-cell-menu, #tab-menu, [data-more], #csv-menu, #csv-open, #sort-menu, #sort-open')) closeMenus();
     });
     // ⋯ のメニュー
     const toggleMenu = (btnId, menuId) => g(btnId).addEventListener('click', (ev) => {
@@ -805,12 +820,11 @@ const BoxUi = (() => {
       g(menuId).hidden = !open;
       g(btnId).setAttribute('aria-expanded', String(open));
     });
-    toggleMenu('box-more-btn', 'box-more');
     toggleMenu('csv-open', 'csv-menu');
     toggleMenu('sort-open', 'sort-menu');
-    g('box-rename').addEventListener('click', () => { closeMenus(); rename(); });
+    g('tab-rename').addEventListener('click', () => { closeMenus(); rename(); });
+    g('tab-clear').addEventListener('click', () => { closeMenus(); clear(); });
     g('box-file').addEventListener('click', () => { closeMenus(); file(); });
-    g('box-clear').addEventListener('click', () => { closeMenus(); clear(); });
     g('box-copy').addEventListener('click', () => { closeMenus(); copy(); });
     // 編集画面(全画面)。入力・進化・種族の検索は、3の行と同じ処理
     bindRowEvents(g('box-sheet'));

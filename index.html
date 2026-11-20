@@ -44,7 +44,6 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   </div>
   <div class="sel-row">
     <span id="box-count" class="note" role="status"></span>
-    <button id="sel-start" type="button" class="sel-start">複数選択</button>
     <span id="sel-tools" class="sel-tools" hidden>
       <span id="sel-count" role="status"></span>
       <button id="sel-all" type="button">全部選ぶ</button>
@@ -155,7 +154,7 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   <button id="sort-dir" type="button" class="sort-dir" aria-label="並べ替えの向きを逆にする">↓</button>
   <span class="bar-grow"></span>
   <button id="csv-open" type="button" aria-haspopup="menu" aria-expanded="false">CSV ▾</button>
-  <button id="box-more-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="そのほかの操作">⋯</button>
+  <button id="sel-toggle" type="button" class="sel-toggle" aria-pressed="false">☑ 選択</button>
 </div>
 <div id="sort-menu" class="pop-menu more-menu bar-sort" role="menu" hidden></div>
 <div id="csv-menu" class="pop-menu more-menu bar-more bar-csv" role="menu" hidden>
@@ -164,9 +163,9 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
   <button id="box-file" type="button" role="menuitem">保存(ファイル)</button>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
-<div id="box-more" class="pop-menu more-menu bar-more" role="menu" hidden>
-  <button id="box-rename" type="button" role="menuitem">名前を変える</button>
-  <button id="box-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
+<div id="tab-menu" class="pop-menu more-menu tab-menu" role="menu" hidden>
+  <button id="tab-rename" type="button" role="menuitem">名前を変える</button>
+  <button id="tab-clear" type="button" role="menuitem" class="danger-text">BOXを空にする</button>
 </div>
 
 <dialog id="filter-dialog" class="modal" aria-labelledby="filter-title">
