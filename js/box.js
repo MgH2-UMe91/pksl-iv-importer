@@ -67,9 +67,7 @@ const Box = (() => {
     if (!row.nature || !NATURES.includes(row.nature)) keys.push('nature'); // 空も印を付ける
     row.sub.forEach((s, i) => { if (s && !SUBSKILLS.includes(s)) keys.push(`sub${i}`); });
     const own = Match.ingredientsOf(row.species);
-    const myth = !!Match.find(row.species)?.myth;
-    if (!myth && own && row.ing.some((g) => g && !own.includes(g))) keys.push('ing');
-    if (myth) { const miss = Match.missingMythIng(row); [0, 1, 2].forEach((i) => { if (miss.includes(i) || (row.ing[i] && !own.includes(row.ing[i]))) keys.push(`ing${i}`); }); } // ミュウなどは、枠ごとに印を付ける(Lvで要らない空の枠は除く)
+    if (own && row.ing.some((g) => g && !own.includes(g))) keys.push('ing');
     return keys;
   };
 

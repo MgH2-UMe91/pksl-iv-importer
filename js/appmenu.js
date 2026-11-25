@@ -33,7 +33,7 @@ const AppMenu = (() => {
   }
 
   // この4つ(sw.js の VERSION・index.html の meta・style.css の --css-version・この定数)は、公開のたびにそろえる(tests で確かめる)
-  const FILE_VERSION = '59';
+  const FILE_VERSION = '60';
   async function versionDetail() {
     const sw = await version();
     const html = document.querySelector('meta[name="app-version"]')?.content ?? '?';

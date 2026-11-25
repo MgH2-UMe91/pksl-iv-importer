@@ -112,8 +112,7 @@ const Match = (() => {
   // 戻り値 { ing: [3], low: [自信の低い枠の番号] }
   function ingredients(species, clues) {
     const p = find(species);
-    if (p && p.myth) return { ing: ['', '', ''], low: [0] }; // 食材は人が選ぶ。確認の印を付ける
-    if (!p || !clues) return { ing: ['', '', ''], low: [] };
+    if (!p || p.myth || !clues) return { ing: ['', '', ''], low: [] };
     const [a, b, c] = p.ing;
     const [a30, b30, a60, b60, c60] = p.amt;
     const low = [];
@@ -474,15 +473,6 @@ const Match = (() => {
   }
 
   // エクスポートの可否を決める。errors が1つでもあれば出さない
-  // 食材を自動で決めない種族(ミュウ・ダークライなど、食材の候補が8種ある種族)で、食材が空のまま出力できない枠
-  // 1つ目は常に、2つ目はLv30から、3つ目はLv60から入る(読み取れないので、人が選ぶ)
-  function missingMythIng(row) {
-    const p = find(row.species);
-    if (!p || !p.myth) return [];
-    const need = [true, row.level >= 30, row.level >= 60];
-    return [0, 1, 2].filter((i) => need[i] && !row.ing[i]);
-  }
-
   function checkRow(row) {
     const errors = [], warnings = [];
     if (!find(row.species)) errors.push('ポケモンを選んでください');
@@ -503,14 +493,13 @@ const Match = (() => {
     }
     // 性格が空のまま取り込むと、個体値計算機が黙って「てれや」にするので、出力させない
     if (!row.nature) errors.push('性格を選んでください(空のままだと、取り込み先で「てれや」になってしまいます)');
-    const myth = missingMythIng(row);
-    for (const i of myth) errors.push(`食材${i + 1}を選んでください(${row.species}の食材は自動では決められません)`);
-    if (!myth.length) {
+    // ミュウ・ダークライは、ひらめきの種で解放するまで食材2・3が「なし」でよい。空は正しい値なので、注意も出さない
+    if (!find(row.species)?.myth) {
       if (row.level >= 30 && !row.ing[1]) warnings.push('食材2が空です');
       if (row.level >= 60 && !row.ing[2]) warnings.push('食材3が空です');
     }
     return { errors, warnings };
   }
 
-  return { tune, lab, colorDist, spriteScore, berryType, ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, missingMythIng, find };
+  return { tune, lab, colorDist, spriteScore, berryType, ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
 })();

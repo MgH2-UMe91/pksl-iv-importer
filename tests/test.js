@@ -98,16 +98,13 @@ eq('性格が空の個体はBOXの「確認が必要」に数える', Box.needsC
 eq('性格が空の個体は性格の枠にオレンジの印', Box.lowKeys(row({ nature: '' })), ['nature']);
 eq('性格があれば印も止めもない', [Box.needsCheck(Box.pack(row({}))), Box.lowKeys(row({}))], [false, []]);
 const mew = (o) => row({ species: 'ミュウ', ing: ['', '', ''], ...o });
-eq('ミュウの食材が空なら、Lvに応じた枠を止める(Lv60は3つ)', Match.missingMythIng(mew({ level: 60 })), [0, 1, 2]);
-eq('ミュウ Lv30は2つ、Lv29は1つ', [Match.missingMythIng(mew({ level: 30 })), Match.missingMythIng(mew({ level: 29 }))], [[0, 1], [0]]);
-eq('ミュウの食材が空なら出力させない', Match.checkRow(mew({ level: 60 })).errors.length, 3);
-eq('ミュウの食材を選べば止めない', Match.checkRow(mew({ level: 60, ing: ['ふといながねぎ', 'とくせんエッグ', 'げきからハーブ'] })).errors, []);
-eq('ミュウの食材が空の個体はBOXの「確認が必要」に数え、食材の枠に印', [Box.needsCheck(Box.pack(mew({ level: 60 }))), Box.lowKeys(mew({ level: 60 }))], [true, ['ing0', 'ing1', 'ing2']]);
-eq('ダークライも同じ扱い', Match.missingMythIng(row({ species: 'ダークライ', level: 60, ing: ['', '', ''] })), [0, 1, 2]);
+eq('ミュウ・ダークライの食材が空(なし)でも止めない・注意も出さない', [mew({ level: 60 }), row({ species: 'ダークライ', level: 60, ing: ['', '', ''] })].map((r) => Match.checkRow(r)), [{ errors: [], warnings: [] }, { errors: [], warnings: [] }]);
+eq('ミュウの食材が空の個体はBOXで「確認が必要」にせず、印も付けない', [Box.needsCheck(Box.pack(mew({ level: 60 }))), Box.lowKeys(mew({ level: 60 }))], [false, []]);
+eq('ミュウで種族に合わない食材は止める', Match.checkRow(mew({ level: 60, ing: ['ふといながねぎ', 'ほっこりポテト', ''] })).errors.length, 1);
 eq('ふつうの種族は食材が空でも注意だけ(止めない)', Match.checkRow(row({ ing: ['あまいミツ', '', ''] })).errors, []);
-eq('ミュウの食材は読み取りでは決めず、確認の印を付ける', Match.ingredients('ミュウ', {}), { ing: ['', '', ''], low: [0] });
+eq('ミュウの食材は読み取りでは決めない(空のまま、印なし)', Match.ingredients('ミュウ', {}), { ing: ['', '', ''], low: [] });
 eq('CSVを読むと、性格が空の行に印が付く', Import.parse('ポケモン,レベル,せいかく\nフシギダネ,60,').rows[0].low, ['nature']);
-eq('CSVを読むと、ミュウの食材が空の行に印が付く', Import.parse('ポケモン,レベル,せいかく\nミュウ,60,ようき').rows[0].low, ['ing0', 'ing1', 'ing2']);
+eq('CSVを読むと、ミュウの食材が空でも印は付かない', Import.parse('ポケモン,レベル,せいかく\nミュウ,60,ようき').rows[0].low, []);
 
 // CSV
 eq('ヘッダーと1行', Csv.build([row({ sub: ['おてつだいボーナス', '', '', '', ''], shiny: true })]),
