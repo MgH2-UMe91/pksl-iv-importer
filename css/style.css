@@ -627,7 +627,7 @@ html.boxtab .box-flag { margin-top: 4px; }
 html.boxtab .box-top { border-bottom: 0; }
 /* 幅の狭い端末(320px など): 下のバーのボタンを詰めて、はみ出さないようにする */
 @media (max-width: 360px) { .box-bar { gap: 5px; padding-left: 6px; padding-right: 6px; } .box-bar button { padding-left: 9px; padding-right: 9px; font-size: 0.85rem; } .box-bar .sort-dir { flex-basis: 30px; width: 30px; } }
-:root { --css-version: '60'; } /* 「このアプリについて」に出す。js・index.html・sw.js の版と同じにする */
+:root { --css-version: '61'; } /* 「このアプリについて」に出す。js・index.html・sw.js の版と同じにする */
 
 /* 下のバーのチップの大きさを、にとよんさんの個体値計算機のBOXの下のバーに合わせる(高さ26px・文字12.8px・余白3.2/12.8px・間8px・丸み全開、並べ替えの向きは22px) */
 :root { --bar-h: calc(42px + max(19.2px, env(safe-area-inset-bottom, 0px))); }
@@ -647,3 +647,10 @@ html.boxtab .box-top { border-bottom: 0; }
 .toast.has-action[hidden] { display: none; }
 .sel-bar .box-warn.ok { color: var(--text); } /* 成功の知らせは警告の橙色にしない */
 .nature-row .field.low select { border-color: var(--low-line); } /* 性格が空・辞書にないときは、緑の枠よりオレンジの印を優先する */
+/* 帯の右上の「アプリにする」(ブラウザで開いているときだけ) */
+.bar:has(#install-btn:not([hidden])) { grid-template-columns: minmax(0, 1fr) auto 44px; }
+.bar h1 { min-width: 0; overflow-wrap: anywhere; }
+.bar-install { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 10px 0 8px; border: 1.5px solid currentColor; border-radius: 16px; background: none; color: inherit; font-size: 0.78rem; font-weight: 700; white-space: nowrap; margin-right: 2px; }
+.bar-install svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.bar-install[hidden] { display: none; }
+@media (max-width: 340px) { .bar-install span { display: none; } .bar-install { padding: 0 8px; } } /* 幅が狭いときはアイコンだけ(タイトルと重ならないように) */

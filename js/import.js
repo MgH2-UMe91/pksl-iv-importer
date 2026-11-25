@@ -119,6 +119,7 @@ const Import = (() => {
       // 1つ目の食材は種族で決まる(相手のインポートも、食材1は見ずに種族から決める)
       if (p && !p.myth && p.ing && ing[0] && ing[0] !== p.ing[0]) ing[0] = p.ing[0];
       else if (p && !p.myth && p.ing && !ing[0]) ing[0] = p.ing[0];
+      if (p && p.myth) Match.fillMyth(species, ing).forEach((g, i) => { ing[i] = g; }); // ミュウなどの固定の食材が空なら入れる
 
       const natureRaw = get(cells, 'nature');
       let nature = '';

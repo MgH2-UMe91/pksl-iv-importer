@@ -23,7 +23,7 @@ const Box = (() => {
   ];
   const unpack = (a) => ({
     nickname: a[0], species: a[1], level: a[2] ?? NaN, skillLevel: a[3] ?? '',
-    ing: [...a[4]], nature: a[5], sub: [...a[6]], shiny: a[7] === 1, mint: a[8] === 1, ribbon: a[9] || 0,
+    ing: Match.fillMyth(a[1], a[4]), nature: a[5], sub: [...a[6]], shiny: a[7] === 1, mint: a[8] === 1, ribbon: a[9] || 0,
     seed: false, base: null, // 銀種を使った後のサブスキルが、その個体のサブスキルとして保存される。戻したときは銀種のチェックなしから始める
   });
   const valid = (a) => Array.isArray(a) && a.length >= 10 && Array.isArray(a[4]) && a[4].length === 3 && Array.isArray(a[6]) && a[6].length === 5;

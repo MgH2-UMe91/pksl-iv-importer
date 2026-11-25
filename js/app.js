@@ -373,6 +373,7 @@ function evolveTo(row, name) {
   const own = p.myth ?? p.ing;
   row.ing = row.ing.map((g) => (own.includes(g) ? g : ''));
   if (!p.myth) row.ing[0] = p.ing[0];
+  else row.ing = Match.fillMyth(name, row.ing);
   if (row.ing[1] && row.ing[1] === p.ing[2]) row.ing[1] = '';
   renderRow(row);
 }
@@ -399,6 +400,7 @@ function setSpecies(row, name) {
       const own = p.myth ?? p.ing;
       row.ing = row.ing.map((g) => (own.includes(g) ? g : ''));
       if (!p.myth) row.ing[0] = p.ing[0]; // 1つ目の食材は種族で決まる
+      else row.ing = Match.fillMyth(name, row.ing); // ミュウなどは固定の食材を入れる
     }
   }
   renderRow(row);

@@ -33,7 +33,7 @@ const AppMenu = (() => {
   }
 
   // この4つ(sw.js の VERSION・index.html の meta・style.css の --css-version・この定数)は、公開のたびにそろえる(tests で確かめる)
-  const FILE_VERSION = '60';
+  const FILE_VERSION = '61';
   async function versionDetail() {
     const sw = await version();
     const html = document.querySelector('meta[name="app-version"]')?.content ?? '?';
@@ -71,10 +71,14 @@ const AppMenu = (() => {
     }
     // ホーム画面のアプリで開いているときは出さない。「もう表示しない」を押した人も、ここからは使える
     g('install-open').hidden = Install.standalone();
-    g('install-open').addEventListener('click', () => {
+    const addApp = () => {
       close();
       if (!Install.addNow()) Install.guide(); // 追加の画面を取ってあればそのまま出し、なければ手順の案内
-    });
+    };
+    g('install-open').addEventListener('click', addApp);
+    // 帯の右上のボタン。ブラウザで開いているときだけ出す(ホーム画面のアプリでは出さない)
+    g('install-btn').hidden = Install.standalone();
+    g('install-btn').addEventListener('click', addApp);
     g('about-open').addEventListener('click', openAbout);
     g('about-close').addEventListener('click', closeAbout);
     g('about-dialog').addEventListener('click', (ev) => { if (ev.target === g('about-dialog')) closeAbout(); });

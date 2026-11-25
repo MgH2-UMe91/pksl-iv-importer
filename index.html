@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="60">
+<meta name="app-version" content="61">
 <title>IV Importer</title>
 <meta name="apple-mobile-web-app-title" content="IV Importer">
 <meta name="application-name" content="IV Importer">
@@ -24,6 +24,7 @@ try { var t = localStorage.getItem('iv-importer-theme'); if (t === 'light' || t 
 <div class="sticky-top" id="sticky-top">
 <header class="bar">
   <h1>スクショ取込みツール</h1>
+  <button id="install-btn" type="button" class="bar-install" hidden aria-label="ホーム画面に追加してアプリにする"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg><span>アプリにする</span></button>
   <button id="app-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="メニュー">⋮</button>
   <div id="app-menu" class="pop-menu bar-menu" role="menu" hidden>
     <div class="menu-head" role="presentation">見た目</div>

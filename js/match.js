@@ -53,6 +53,11 @@ const Match = (() => {
   const result = (m) => (m ? { value: m.value, confidence: m.exact ? 'high' : 'low' } : { value: '', confidence: 'none' });
 
   const find = (name) => POKEMON.find((p) => p.name === name) ?? null;
+  // 食材を自動で決めない種族の、最初から持っている(固定の)食材。個体値計算機のデータと同じ。ほかの枠はひらめきの種で解放するまで「なし」
+  const MYTH_FIXED = { 'ミュウ': ['とくせんエッグ', 'げきからハーブ', ''], 'ダークライ': ['マメミート', '', ''] };
+  // 固定の枠が空なら入れる。別の値が入っていれば上書きしない
+  const fillMyth = (species, ing) => { const f = MYTH_FIXED[species]; return f ? [0, 1, 2].map((i) => ing[i] || f[i]) : [...ing]; };
+
   function ingredientsOf(name) {
     const p = find(name);
     return p ? p.myth ?? p.ing : null;
@@ -112,7 +117,8 @@ const Match = (() => {
   // 戻り値 { ing: [3], low: [自信の低い枠の番号] }
   function ingredients(species, clues) {
     const p = find(species);
-    if (!p || p.myth || !clues) return { ing: ['', '', ''], low: [] };
+    if (p && p.myth) return { ing: fillMyth(species, ['', '', '']), low: [] };
+    if (!p || !clues) return { ing: ['', '', ''], low: [] };
     const [a, b, c] = p.ing;
     const [a30, b30, a60, b60, c60] = p.amt;
     const low = [];
@@ -501,5 +507,5 @@ const Match = (() => {
     return { errors, warnings };
   }
 
-  return { tune, lab, colorDist, spriteScore, berryType, ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, find };
+  return { tune, lab, colorDist, spriteScore, berryType, ingredientFit, skillInfo, skillOf, sightings, candidates, guessSpecies, rootOf, fold, distance, best, species, nature, subskill, ingredients, combos, skillLevelFrom, levelFrom, GAME_MAX_LEVEL, applySeed, setSeed, editSub, line, descendants, finals, ingredientsOf, search, checkRow, fillMyth, find };
 })();
