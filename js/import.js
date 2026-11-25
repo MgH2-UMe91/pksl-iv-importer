@@ -122,9 +122,14 @@ const Import = (() => {
 
       const natureRaw = get(cells, 'nature');
       let nature = '';
+      if (!natureRaw) { low.push('nature'); notes.push('性格が空です。選んでください。'); }
       if (natureRaw) {
         nature = m.nature.get(norm(natureRaw)) ?? natureRaw;
         if (!m.nature.has(norm(natureRaw))) { low.push('nature'); notes.push(`性格「${natureRaw}」が辞書にありません。`); }
+      }
+      if (p && p.myth) {
+        const need = Match.missingMythIng({ species, level, ing });
+        if (need.length) { need.forEach((i) => low.push(`ing${i}`)); notes.push(`食材${need.map((i) => i + 1).join('・')}が空です。${species}の食材は選んでください。`); }
       }
       const sub = [0, 1, 2, 3, 4].map((i) => {
         const raw = get(cells, `sub${i}`);

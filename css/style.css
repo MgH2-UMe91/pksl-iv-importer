@@ -627,7 +627,7 @@ html.boxtab .box-flag { margin-top: 4px; }
 html.boxtab .box-top { border-bottom: 0; }
 /* 幅の狭い端末(320px など): 下のバーのボタンを詰めて、はみ出さないようにする */
 @media (max-width: 360px) { .box-bar { gap: 5px; padding-left: 6px; padding-right: 6px; } .box-bar button { padding-left: 9px; padding-right: 9px; font-size: 0.85rem; } .box-bar .sort-dir { flex-basis: 30px; width: 30px; } }
-:root { --css-version: '58'; } /* 「このアプリについて」に出す。js・index.html・sw.js の版と同じにする */
+:root { --css-version: '59'; } /* 「このアプリについて」に出す。js・index.html・sw.js の版と同じにする */
 
 /* 下のバーのチップの大きさを、にとよんさんの個体値計算機のBOXの下のバーに合わせる(高さ26px・文字12.8px・余白3.2/12.8px・間8px・丸み全開、並べ替えの向きは22px) */
 :root { --bar-h: calc(42px + max(19.2px, env(safe-area-inset-bottom, 0px))); }
@@ -646,3 +646,4 @@ html.boxtab .box-top { border-bottom: 0; }
 .toast.has-action button { border: 0; background: none; color: #ffd870; font-weight: 700; font-size: 0.88rem; min-height: 32px; padding: 0 10px; border-radius: 16px; white-space: nowrap; }
 .toast.has-action[hidden] { display: none; }
 .sel-bar .box-warn.ok { color: var(--text); } /* 成功の知らせは警告の橙色にしない */
+.nature-row .field.low select { border-color: var(--low-line); } /* 性格が空・辞書にないときは、緑の枠よりオレンジの印を優先する */

@@ -92,11 +92,36 @@ eq('スキルレベルは空でもよい', Match.checkRow(row({ skillLevel: '' }
 eq('範囲外のスキルレベルは止める', Match.checkRow(row({ skillLevel: 9 })).errors.length, 1);
 eq('スキルレベルはCSVに入る', Csv.build([row({ skillLevel: 6 })]).split(/\n/)[1].split(',')[3], '6');
 
+// 性格が空・食材を自動で決めない種族の食材が空 → 確認が必要(出力させない)
+eq('性格が空なら出力させない', Match.checkRow(row({ nature: '' })).errors.length, 1);
+eq('性格が空の個体はBOXの「確認が必要」に数える', Box.needsCheck(Box.pack(row({ nature: '' }))), true);
+eq('性格が空の個体は性格の枠にオレンジの印', Box.lowKeys(row({ nature: '' })), ['nature']);
+eq('性格があれば印も止めもない', [Box.needsCheck(Box.pack(row({}))), Box.lowKeys(row({}))], [false, []]);
+const mew = (o) => row({ species: 'ミュウ', ing: ['', '', ''], ...o });
+eq('ミュウの食材が空なら、Lvに応じた枠を止める(Lv60は3つ)', Match.missingMythIng(mew({ level: 60 })), [0, 1, 2]);
+eq('ミュウ Lv30は2つ、Lv29は1つ', [Match.missingMythIng(mew({ level: 30 })), Match.missingMythIng(mew({ level: 29 }))], [[0, 1], [0]]);
+eq('ミュウの食材が空なら出力させない', Match.checkRow(mew({ level: 60 })).errors.length, 3);
+eq('ミュウの食材を選べば止めない', Match.checkRow(mew({ level: 60, ing: ['ふといながねぎ', 'とくせんエッグ', 'げきからハーブ'] })).errors, []);
+eq('ミュウの食材が空の個体はBOXの「確認が必要」に数え、食材の枠に印', [Box.needsCheck(Box.pack(mew({ level: 60 }))), Box.lowKeys(mew({ level: 60 }))], [true, ['ing0', 'ing1', 'ing2']]);
+eq('ダークライも同じ扱い', Match.missingMythIng(row({ species: 'ダークライ', level: 60, ing: ['', '', ''] })), [0, 1, 2]);
+eq('ふつうの種族は食材が空でも注意だけ(止めない)', Match.checkRow(row({ ing: ['あまいミツ', '', ''] })).errors, []);
+eq('ミュウの食材は読み取りでは決めず、確認の印を付ける', Match.ingredients('ミュウ', {}), { ing: ['', '', ''], low: [0] });
+eq('CSVを読むと、性格が空の行に印が付く', Import.parse('ポケモン,レベル,せいかく\nフシギダネ,60,').rows[0].low, ['nature']);
+eq('CSVを読むと、ミュウの食材が空の行に印が付く', Import.parse('ポケモン,レベル,せいかく\nミュウ,60,ようき').rows[0].low, ['ing0', 'ing1', 'ing2']);
+
 // CSV
 eq('ヘッダーと1行', Csv.build([row({ sub: ['おてつだいボーナス', '', '', '', ''], shiny: true })]),
-  'nickname,Pokemon,level,skill level,ing 1,ing 2,ing 3,nature,Lv10,Lv25,Lv50,Lv70,Lv80,shiny,mint,ribbon\n,フシギダネ,60,,あまいミツ,あんみんトマト,ほっこりポテト,ようき,おてつだいボーナス,,,,,1,0,0\n');
-eq('ミントと眠った時間はCSVの mint と ribbon に入る', Csv.build([row({ mint: true, ribbon: 1000 })]).split(/\n/)[1].split(',').slice(14), ['1', '1000']);
-eq('指定がなければ mint 0 と ribbon 0', Csv.build([row({})]).split(/\n/)[1].split(',').slice(14), ['0', '0']);
+  'ニックネーム,ポケモン,レベル,スキルレベル,食材1,食材2,食材3,メインスキル,せいかく,まっしろミント,Lv10,Lv25,Lv50,Lv70,Lv80,一緒に眠った時間,色違い,お気に入り\n,フシギダネ,60,,あまいミツ,あんみんトマト,ほっこりポテト,食材ゲットS,ようき,0,おてつだいボーナス,,,,,0,1,\n');
+const csvCell = (r, h) => { const [hd, ln] = Csv.build([r]).split(/\n/); return ln.split(',')[hd.split(',').indexOf(h)]; };
+eq('ミントと眠った時間は「まっしろミント」「一緒に眠った時間」に入る', [csvCell(row({ mint: true, ribbon: 1000 }), 'まっしろミント'), csvCell(row({ mint: true, ribbon: 1000 }), '一緒に眠った時間')], ['1', '1000']);
+eq('指定がなければミント 0・眠った時間 0', [csvCell(row({}), 'まっしろミント'), csvCell(row({}), '一緒に眠った時間')], ['0', '0']);
+eq('CSVの見出しは個体値計算機(日本語表示)と同じ18列の並び', Csv.HEADER.join(','), 'ニックネーム,ポケモン,レベル,スキルレベル,食材1,食材2,食材3,メインスキル,せいかく,まっしろミント,Lv10,Lv25,Lv50,Lv70,Lv80,一緒に眠った時間,色違い,お気に入り');
+eq('どの行も18列', [row({}), row({ species: 'ミュウ' }), row({ nickname: 'ab' })].map((r) => Csv.build([r]).split(/\n/)[1].split(',').length), [18, 18, 18]);
+eq('お気に入りは空欄', csvCell(row({}), 'お気に入り'), '');
+eq('メインスキルは種族から日本語名で入る', [csvCell(row({ species: 'ピカチュウ' }), 'メインスキル'), csvCell(row({ species: 'カメックス' }), 'メインスキル')], [MAIN_SKILLS['ピカチュウ'], MAIN_SKILLS['カメックス']]);
+eq('ミュウのメインスキルは空欄(個体ごとに選ぶ形のため)', csvCell(row({ species: 'ミュウ' }), 'メインスキル'), '');
+eq('姿違いの種族名は個体値計算機と同じ「名前 (姿)」', csvCell(row({ species: 'ピカチュウ(キャプテン)' }), 'ポケモン'), 'ピカチュウ (キャプテン)');
+eq('色違いは1、そうでなければ0', [csvCell(row({ shiny: true }), '色違い'), csvCell(row({}), '色違い')], ['1', '0']);
 eq('カンマ入りの名前', Csv.escape('a,b'), '"a,b"');
 eq('引用符入りの名前', Csv.escape('a"b'), '"a""b"');
 eq('改行は空白に', Csv.escape('a\nb'), 'a b');
@@ -132,7 +157,7 @@ eq('色が決まらないときは誤読に印を付ける', Match.subskill('お
 eq('色の中の候補と色を問わない候補が食い違うときは印を付ける(色の誤検出に備える)', Match.subskill('スキルレベルアップS', 'white').confidence, 'low');
 eq('色の中の近い候補は、取り違えやすい S と M でも色で決まる', Match.subskill('おてつだいスピードM', 'white').value, 'おてつだいスピードS');
 eq('読めなければ空', Match.subskill('', 'white').value, '');
-const csvSub = (r) => Csv.build([r]).split(/\r?\n/)[1].split(',').slice(8, 13);
+const csvSub = (r) => Csv.build([r]).split(/\r?\n/)[1].split(',').slice(10, 15);
 const S5 = ['スキル確率アップS', 'おてつだいスピードS', C + 'S', '', ''];
 const S5on = ['スキル確率アップM', 'おてつだいスピードM', C + 'M', '', ''];
 const mk = () => row({ seed: false, base: null, sub: [...S5] });
@@ -525,6 +550,11 @@ eq('両方に入らないこともある', Box.plan(100, [250, 280]).map((x) => 
   eq('個体値計算機: サブスキルは Lv10/25/50/70/80 の順', n.rows[0].sub, ['おてつだいスピードM', 'きのみの数S', '', '', '']);
   eq('個体値計算機: 700時間は500の段階、ミントと色違いは1', [n.rows[0].ribbon, n.rows[0].mint, n.rows[0].shiny], [500, true, true]);
   eq('個体値計算機: メインスキルとお気に入りは読まない(印も付かない)', [n.rows[0].low, n.rows[0].notes], [[], []]);
+  // 古い形(版58より前に保存したCSV)も読める
+  const old = Import.parse(Csv.OLD_HEADER.join(',') + '\nしぐれ,カメックス,61,5,モーモーミルク,モーモーミルク,モーモーミルク,ひかえめ,おてつだいスピードM,きのみの数S,,,,1,1,700');
+  eq('古い形のCSVも読める', [old.rows.length, old.rows[0].species, old.rows[0].level, old.rows[0].nature, old.rows[0].sub, old.rows[0].shiny, old.rows[0].mint, old.rows[0].ribbon, old.rows[0].low], [1, 'カメックス', 61, 'ひかえめ', ['おてつだいスピードM', 'きのみの数S', '', '', ''], true, true, 500, []]);
+  eq('個体値計算機の「名前 (姿)」の書き方も読める', Import.parse('ポケモン,レベル\nピカチュウ (キャプテン),10').rows[0].species, 'ピカチュウ(キャプテン)');
+  eq('新しい形のCSVは古い形と同じ個体に戻る', Import.parse(Csv.build([row({ nickname: 'x', skillLevel: 4, shiny: true, mint: true, ribbon: 500 })])).rows.map(pick), [pick({ ...row({ nickname: 'x', skillLevel: 4, ribbon: 500 }), shiny: true, mint: true })]);
   eq('個体値計算機: 食材3が空でも読める', [n.rows[1].ing, n.rows[1].ribbon, n.rows[1].mint], [['あまいミツ', 'あんみんトマト', ''], 0, false]);
   eq('ribbon の段階の区切り', ['199', '200', '499', '500', '999', '1000', '1999', '2000', '', 'x'].map((h) => Import.parse(`ポケモン,ribbon\nフシギダネ,${h}`).rows[0].ribbon), [0, 200, 200, 500, 500, 1000, 1000, 2000, 0, 0]);
 
@@ -541,8 +571,8 @@ eq('両方に入らないこともある', Box.plan(100, [250, 280]).map((x) => 
   eq('辞書にない名前は種族を空にして印と注意を付ける', [odd.rows[0].species, odd.rows[0].nickname, odd.rows[0].low.includes('species')], ['', 'あ', true]);
   eq('辞書にない性格・サブ・食材は値を残して印を付ける', [odd.rows[0].nature, odd.rows[0].sub[0], odd.rows[0].ing[1], odd.rows[0].low.slice(1)], ['ふしぎ', 'ねむけ', 'へんなもの', ['ing', 'nature', 'sub0']]);
   eq('辞書にない値は3の検査で止まる(出力しない)', Match.checkRow({ ...odd.rows[0], pending: false }).errors.length > 0, true);
-  eq('英語名は辞書にないので印が付く', Import.parse('Pokemon\nBulbasaur').rows[0].low, ['species', 'level']);
-  eq('レベルがなければ印と注意を付ける', [Import.parse('Pokemon\nフシギダネ').rows[0].low, Number.isNaN(Import.parse('Pokemon\nフシギダネ').rows[0].level)], [['level'], true]);
+  eq('英語名は辞書にないので印が付く', Import.parse('Pokemon\nBulbasaur').rows[0].low, ['species', 'level', 'nature']);
+  eq('レベルがなければ印と注意を付ける', [Import.parse('Pokemon\nフシギダネ').rows[0].low, Number.isNaN(Import.parse('Pokemon\nフシギダネ').rows[0].level)], [['level', 'nature'], true]);
   eq('食材1は種族で決まる(相手のインポートと同じ)', Import.parse('Pokemon,ing 1,ing 2\nフシギダネ,げきからハーブ,あんみんトマト').rows[0].ing, ['あまいミツ', 'あんみんトマト', '']);
   eq('空行は読み飛ばす', Import.parse('Pokemon,level\nフシギダネ,5\n\n,\nフシギダネ,6\n').rows.length, 2);
 

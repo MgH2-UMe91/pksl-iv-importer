@@ -35,6 +35,7 @@ function applyReading(row, read) {
 
   const take = (key, m) => { if (m.confidence === 'low') row.low.add(key); return m.value; };
   row.nature = take('nature', Match.nature(read.nature));
+  if (!row.nature) row.low.add('nature'); // 読めなかったときも印を付ける(空のままでは出力できない)
   row.sub = read.sub.map((t, i) => take(`sub${i}`, Match.subskill(t, read.subColor[i])));
   row.readLevel = read.level ?? null;
   if (read.level === null) row.low.add('level'); // 読めない、または範囲外のときは空欄にして印を付ける
@@ -67,8 +68,9 @@ function guessSpecies(row, read) {
 function applyIngredients(row) {
   const { ing, low } = Match.ingredients(row.species, row.clues);
   row.ing = ing;
-  row.low.delete('ing');
-  if (low.length) row.low.add('ing');
+  for (const k of ['ing', 'ing0', 'ing1', 'ing2']) row.low.delete(k);
+  // 食材を自動で決めない種族(ミュウなど)は、3つの選択欄それぞれにオレンジの印を付ける
+  if (low.length) { if (Match.find(row.species)?.myth) ['ing0', 'ing1', 'ing2'].forEach((k) => row.low.add(k)); else row.low.add('ing'); }
 }
 
 // long: 名前が長い選択欄。狭い画面では1列に広げて、名前の全体を読めるようにする
